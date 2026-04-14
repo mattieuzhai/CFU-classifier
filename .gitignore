@@ -2,3 +2,7 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# Ignore all data subfolders except data/split
+data/*
+!data/split/
