@@ -1,0 +1,7 @@
+path: /path/to/CFU-classifier/data/tiled  # UPDATE: absolute path on the cluster
+train: train/images
+val: val/images
+test: test/images
+
+nc: 4
+names: ['GM', 'BFU', 'E', 'GEMM']
