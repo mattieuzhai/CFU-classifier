@@ -6,3 +6,4 @@ __pycache__/
 # Ignore all data subfolders except data/split
 data/*
 !data/split/
+!data/tiled/
