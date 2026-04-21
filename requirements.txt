@@ -64,6 +64,7 @@ termcolor==3.3.0
 terminaltables==3.1.10
 threadpoolctl==3.6.0
 torch==2.11.0
+ultralytics
 tornado==6.5.5
 tqdm==4.67.3
 traitlets==5.14.3
