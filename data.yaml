@@ -1,4 +1,4 @@
-path: /path/to/CFU-classifier/data/tiled  # UPDATE: absolute path on the cluster
+path: /home/mzhai72/CFU_classifier/data/tiled
 train: train/images
 val: val/images
 test: test/images
