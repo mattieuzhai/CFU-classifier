@@ -1,7 +1,6 @@
 path: /home/mzhai72/CFU_classifier/data/tiled
 train: train/images
-val: val/images
-test: test/images
+val: train/images
 
 nc: 4
 names: ['GM', 'BFU', 'E', 'GEMM']

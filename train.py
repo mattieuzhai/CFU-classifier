@@ -1,7 +1,7 @@
 from pathlib import Path
 from ultralytics import YOLO
 
-model = YOLO("yolov8n.pt")  # nano model; swap for yolov8s.pt / yolov8m.pt if needed
+model = YOLO("yolo26n.pt")  # nano detection model
 
 model.train(
     data=str(Path(__file__).parent / "data.yaml"),
