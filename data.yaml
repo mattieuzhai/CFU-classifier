@@ -1,6 +1,6 @@
-path: /home/mzhai72/CFU_classifier/data/tiled
+path: /home/mzhai72/CFU_classifier/data/tiled_1280
 train: train/images
-val: train/images
+val: train/images  # val split has no annotations yet; using train as proxy
 
 nc: 4
 names: ['GM', 'BFU', 'E', 'GEMM']
