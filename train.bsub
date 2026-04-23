@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J cfu_train
+#BSUB -J cfu_train_1280
 #BSUB -q gpu_priority
 #BSUB -gpu "num=1"
 #BSUB -n 4
