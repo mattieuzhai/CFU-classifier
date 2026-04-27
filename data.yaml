@@ -1,4 +1,4 @@
-path: /home/mzhai72/CFU_classifier/data/tiled_1600
+path: /home/mzhai72/CFU_classifier/data/tiled_3200
 train: train/images
 val: train/images  # val split has no annotations yet; using train as proxy
 
