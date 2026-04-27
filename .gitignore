@@ -4,7 +4,5 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Ignore all data subfolders except data/split
-data/images/
-data/images_resized/
-data/images_without_mask/
+data/*
 
