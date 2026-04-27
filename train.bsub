@@ -2,8 +2,8 @@
 #BSUB -J cfu_train_1280
 #BSUB -q gpu_priority
 #BSUB -gpu "num=1:j_exclusive=no"
-#BSUB -n 8
-#BSUB -R "rusage[mem=64000]"
+#BSUB -n 4
+#BSUB -R "rusage[mem=16000]"
 #BSUB -W 8:00
 #BSUB -o /home/mzhai72/CFU_classifier/logs/train_%J.out
 #BSUB -e /home/mzhai72/CFU_classifier/logs/train_%J.err
