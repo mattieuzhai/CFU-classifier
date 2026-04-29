@@ -1,7 +1,7 @@
 #!/bin/bash
-#BSUB -J cfu_train_1280
+#BSUB -J cfu_train_3200
 #BSUB -q gpu_priority
-#BSUB -gpu "num=1:j_exclusive=no"
+#BSUB -gpu "num=1:j_exclusive=yes"
 #BSUB -n 4
 #BSUB -R "rusage[mem=16000]"
 #BSUB -W 8:00
@@ -17,3 +17,4 @@ source activate cfu-env
 cd /home/mzhai72/CFU_classifier
 
 python train.py
+
