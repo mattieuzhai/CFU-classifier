@@ -1,7 +1,7 @@
 #!/bin/bash
 #BSUB -J cfu_train_3200
 #BSUB -q gpu_priority
-#BSUB -gpu "num=1:j_exclusive=yes"
+#BSUB -gpu "num=2:j_exclusive=yes"
 #BSUB -n 4
 #BSUB -R "rusage[mem=16000]"
 #BSUB -W 8:00
