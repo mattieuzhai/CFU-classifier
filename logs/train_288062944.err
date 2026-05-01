@@ -1,0 +1,164 @@
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 1264, in wait
+    return self._wait(timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 2053, in _wait
+    (pid, sts) = self._try_wait(0)
+                 ^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 2011, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/research/rgs01/home/clusterHome/mzhai72/CFU_classifier/train.py", line 6, in <module>
+    model.train(
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/model.py", line 788, in train
+    self.trainer.train()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 238, in train
+    subprocess.run(cmd, check=True)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 550, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 1201, in communicate
+    self.wait()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 1277, in wait
+    self._wait(timeout=sigint_timeout)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 2047, in _wait
+    time.sleep(delay)
+KeyboardInterrupt
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/mzhai72/.config/Ultralytics/DDP/_temp_t_rciig523452612960064.py", line 19, in <module>
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 246, in train
+[rank1]:     self._do_train()
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 410, in _do_train
+[rank1]:     for i, batch in pbar:
+[rank1]:                     ^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/data/build.py", line 76, in __iter__
+[rank1]:     yield next(self.iterator)
+[rank1]:           ^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 741, in __next__
+[rank1]:     data = self._next_data()
+[rank1]:            ^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1524, in _next_data
+[rank1]:     idx, data = self._get_data()
+[rank1]:                 ^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1473, in _get_data
+[rank1]:     success, data = self._try_get_data()
+[rank1]:                     ^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1310, in _try_get_data
+[rank1]:     data = self._data_queue.get(timeout=timeout)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/queue.py", line 180, in get
+[rank1]: Exception in thread Thread-2 (_pin_memory_loop):
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+[rank1]:     self.not_empty.wait(remaining)
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 359, in wait
+[rank1]:     gotit = waiter.acquire(True, timeout)
+[rank1]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]: KeyboardInterrupt
+Exception in thread Thread-13 (_pin_memory_loop):
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 52, in _pin_memory_loop
+    do_one_step()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 28, in do_one_step
+    r = in_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/queues.py", line 122, in get
+    return _ForkingPickler.loads(res)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/multiprocessing/reductions.py", line 540, in rebuild_storage_fd
+    fd = df.detach()
+         ^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 57, in detach
+    with _resource_sharer.get_connection(self._id) as conn:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 86, in get_connection
+    c = Client(address, authkey=process.current_process().authkey)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 525, in Client
+    answer_challenge(c, authkey)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 953, in answer_challenge
+    message = connection.recv_bytes(256)         # reject large message
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 216, in recv_bytes
+    buf = self._recv_bytes(maxlength)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 430, in _recv_bytes
+    buf = self._recv(4)
+          ^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 395, in _recv
+    chunk = read(handle, remaining)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [Errno 104] Connection reset by peer
+Exception in thread Thread-14 (_pin_memory_loop):
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 52, in _pin_memory_loop
+    do_one_step()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 28, in do_one_step
+    r = in_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/queues.py", line 122, in get
+    return _ForkingPickler.loads(res)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/multiprocessing/reductions.py", line 540, in rebuild_storage_fd
+    fd = df.detach()
+         ^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 57, in detach
+    with _resource_sharer.get_connection(self._id) as conn:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 86, in get_connection
+    c = Client(address, authkey=process.current_process().authkey)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 519, in Client
+    c = SocketClient(address)
+        ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 647, in SocketClient
+    s.connect(address)
+FileNotFoundError: [Errno 2] No such file or directory
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1310, in _try_get_data
+[rank0]:     data = self._data_queue.get(timeout=timeout)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/queue.py", line 179, in get
+[rank0]:     raise Empty
+[rank0]: _queue.Empty
+
+[rank0]: The above exception was the direct cause of the following exception:
+
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/mzhai72/.config/Ultralytics/DDP/_temp_t_rciig523452612960064.py", line 19, in <module>
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 246, in train
+[rank0]:     self._do_train()
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 410, in _do_train
+[rank0]:     for i, batch in pbar:
+[rank0]:                     ^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/tqdm.py", line 350, in __iter__
+[rank0]:     for item in self.iterable:
+[rank0]:                 ^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/data/build.py", line 76, in __iter__
+[rank0]:     yield next(self.iterator)
+[rank0]:           ^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 741, in __next__
+[rank0]:     data = self._next_data()
+[rank0]:            ^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1524, in _next_data
+[rank0]:     idx, data = self._get_data()
+[rank0]:                 ^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1473, in _get_data
+[rank0]:     success, data = self._try_get_data()
+[rank0]:                     ^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1323, in _try_get_data
+[rank0]:     raise RuntimeError(
+[rank0]: RuntimeError: DataLoader worker (pid(s) 312031, 312032, 312033, 312034, 312036, 312039, 312041, 312044) exited unexpectedly
