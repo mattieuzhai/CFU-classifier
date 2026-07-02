@@ -1,0 +1,87 @@
+metadata:
+  name: ultralytics-yolo-cfu
+  namespace: cvat
+  annotations:
+    name: YOLO CFU Colony Detector
+    version: 2
+    type: detector
+    spec: |
+      [
+        { "id": 0, "name": "BFU",  "type": "rectangle" },
+        { "id": 1, "name": "GM",   "type": "rectangle" },
+        { "id": 2, "name": "E",    "type": "rectangle" },
+        { "id": 3, "name": "GEMM", "type": "rectangle" }
+      ]
+
+spec:
+  description: YOLO model (best.pt) for CFU colony detection — BFU / GM / E / GEMM
+  runtime: "python:3.9"
+  handler: main:handler
+  eventTimeout: 300s
+
+  env:
+    # --- Tiling -----------------------------------------------------------
+    # Plate images are 6400x6400; a single downscaled pass shrinks the small
+    # colonies. Tiling slices the image into overlapping tiles, runs the model
+    # on each at native resolution, then merges boxes with a global NMS.
+    - name: YOLO_TILING
+      value: "1"            # "0" = single whole-image pass instead
+    - name: YOLO_TILE_SIZE
+      value: "1600"         # tile size in px (6400 -> overlapping ~4x4 grid)
+    - name: YOLO_TILE_OVERLAP
+      value: "0.2"          # 20% overlap so colonies on tile seams aren't missed
+    - name: YOLO_NMS_IOU
+      value: "0.4"         # IoU for class-agnostic NMS across tile overlaps
+    - name: YOLO_NMS_CONTAIN
+      value: "0.4"          # drop a box if >60% of its area sits inside a
+                            # higher-confidence box (removes tile-edge fragments)
+    # imgsz fed to the model per tile. Leave unset to use the tile size (native
+    # resolution). Set e.g. "800" to roughly match the model's training scale.
+    # - name: YOLO_IMGSZ
+    #   value: "1600"
+
+  build:
+    image: cvat.ultralytics.yolo.cfu
+    # Use a stock python:3.9 base so it matches the offline wheels Nuclio stages
+    # for the python:3.9 runtime (the ultralytics base image ships a newer Python
+    # that breaks Nuclio's nuclio-sdk/msgpack install). We install Ultralytics
+    # ourselves below.
+    baseImage: python:3.9
+
+    directives:
+      preCopy:
+        - kind: WORKDIR
+          value: /opt/nuclio
+        # Ultralytics pulls in OpenCV, whose cv2 needs these system libs that
+        # the slim python:3.9 image lacks (otherwise: "libGL.so.1: cannot open
+        # shared object file" at import time).
+        - kind: RUN
+          value: apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+        # Nuclio's build does an OFFLINE install of nuclio-sdk + msgpack from
+        # /home/nuclio/bin/py3.9-whl, which only exists in Nuclio's own base
+        # images — not in stock python:3.9. Pre-stage those wheels there so the
+        # offline step can find them.
+        - kind: RUN
+          value: mkdir -p /home/nuclio/bin/py3.9-whl && pip download --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org -d /home/nuclio/bin/py3.9-whl msgpack nuclio-sdk
+        # Install Ultralytics (pulls torch in as a dependency) + headless
+        # OpenCV, all from PyPI. We avoid the download.pytorch.org index because
+        # it redirects to a CDN host that this network's TLS-intercepting proxy
+        # breaks; PyPI serves wheels directly so --trusted-host works.
+        - kind: RUN
+          value: pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org ultralytics opencv-python-headless pillow
+
+  triggers:
+    myHttpTrigger:
+      maxWorkers: 1
+      kind: "http"
+      workerAvailabilityTimeoutMilliseconds: 10000
+      attributes:
+        # 32 MB — colony-plate images are large
+        maxRequestBodySize: 33554432
+
+  platform:
+    attributes:
+      restartPolicy:
+        name: always
+        maximumRetryCount: 3
+      mountMode: volume
