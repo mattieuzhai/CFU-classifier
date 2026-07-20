@@ -50,13 +50,20 @@ runs/detect/*/weights/best.pt   trained YOLO weights (one folder per attempt)
   everything to a uniform 6400×6400, and split into `train/val/test` folders
   in Ultralytics format. This is the first step that turns `data/images/`
   into a `data/split*` dataset.
-- **`training_prep.ipynb`** — Tiles a `split*` dataset into `data/tiled_*`
-  using SAHI: slices each image into a `grid × grid` set of overlapping tiles
-  and remaps each YOLO annotation into the correct tile's coordinate space
-  (dropping boxes that fall mostly outside a tile via `min_visibility`).
-  Includes a visualization cell that draws the exact tile grid over a sample
-  image so tiling parameters can be sanity-checked before committing to a
-  full run.
+- **`training_prep.ipynb`** — Turns a `split*` dataset into `data/tiled_*`.
+  Starts with a **pre-flight check & cleanup** of the split: a read-only
+  report (per-split counts, cross-split duplicate images with content hashes,
+  unannotated images in train/val, and punctuation-insensitive coverage vs
+  raw `data/images` — flagging both intentionally-excluded `(df)` masks and
+  genuinely missing plates), followed by a `DRY_RUN`-guarded cleanup that
+  routes every unannotated image to `test`, keeps each annotated image in its
+  home split (train beats val on conflict), and deletes duplicate copies so
+  nothing leaks across splits. Then tiles with SAHI: slices each image into a
+  `grid × grid` set of overlapping tiles and remaps each YOLO annotation into
+  the correct tile's coordinate space (dropping boxes that fall mostly outside
+  a tile via `min_visibility`). Includes a visualization cell that draws the
+  exact tile grid over a sample image so tiling parameters can be
+  sanity-checked before committing to a full run.
 - **`annotation_progress.ipynb`** — QC dashboard over a labeled split
   (currently `split_AI/train`): reports how many images are annotated vs.
   not, total boxes and image counts per class, a per-image class heatmap,
@@ -70,7 +77,10 @@ runs/detect/*/weights/best.pt   trained YOLO weights (one folder per attempt)
 - **`inference.ipynb`** — Runs a trained model (`runs/detect/.../best.pt`)
   over a folder of full-resolution plate images using the same
   tile → detect → merge approach as training (merge via NMS or weighted
-  boxes fusion). Produces per-image class counts, box-size statistics,
+  boxes fusion). Tiling `GRID`/`OVERLAP_RATIO` are read automatically from the
+  `tiling_settings.txt` of the `tiled_*` dataset the model was trained on (set
+  `TILED_DIR`), so inference tiling always matches training without hand-editing
+  between runs. Produces per-image class counts, box-size statistics,
   annotated preview plots, and (commented-out, ready-to-uncomment) cells to
   save counts to CSV, save annotated images, and write predictions out as
   YOLO `.txt` pre-annotations for review in `labelImg` — this is how
