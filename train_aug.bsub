@@ -1,0 +1,19 @@
+#!/bin/bash
+#BSUB -J cfu_train_3200_aug
+#BSUB -q gpu_priority
+#BSUB -gpu "num=2:j_exclusive=yes"
+#BSUB -n 4
+#BSUB -R "rusage[mem=16000]"
+#BSUB -W 8:00
+#BSUB -o /home/mzhai72/CFU_classifier/logs/train_aug_%J.out
+#BSUB -e /home/mzhai72/CFU_classifier/logs/train_aug_%J.err
+
+mkdir -p /home/mzhai72/CFU_classifier/logs
+
+module load miniconda
+module load cuda11.8/toolkit/11.8.0
+source activate cfu-env
+
+cd /home/mzhai72/CFU_classifier
+
+python train_aug.py
