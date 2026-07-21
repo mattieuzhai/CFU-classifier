@@ -85,6 +85,15 @@ runs/detect/*/weights/best.pt   trained YOLO weights (one folder per attempt)
   save counts to CSV, save annotated images, and write predictions out as
   YOLO `.txt` pre-annotations for review in `labelImg` — this is how
   `data/split_AI` gets populated.
+- **`evaluate_run.ipynb`** — Point `RUN_DIR` at any Ultralytics run folder and
+  Run All to get a full report on that training run: config + best/last
+  checkpoint metrics, per-epoch learning curves (losses, P/R/mAP) with the best
+  epoch marked, convergence/overfitting diagnostics (plateau, early-best, val-loss
+  rebound), every plot Ultralytics generated (results, confusion matrix, PR/P/R/F1
+  curves, label stats), and val ground-truth-vs-prediction samples. An optional
+  cell re-runs `model.val()` for a fresh per-class table and a train-vs-val
+  (bias/variance) comparison. Everything but that last cell works offline from the
+  run folder alone.
 - **`app.ipynb`** — Interactive Gradio demo: upload a plate image, run
   tiled inference, and get an editable detections table (add/remove/correct
   boxes) with a live-updating preview and a button to save corrected
