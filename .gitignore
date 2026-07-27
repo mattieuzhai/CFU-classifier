@@ -6,3 +6,8 @@ __pycache__/
 # Ignore all data subfolders except data/split
 data/*
 
+
+# PyInstaller build output (multi-GB — never commit)
+dist/
+build_pyinstaller/
+*.tmp
