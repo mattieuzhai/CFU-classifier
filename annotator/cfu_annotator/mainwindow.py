@@ -2,8 +2,10 @@
 
 from pathlib import Path
 
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QColor, QIcon, QImageReader, QKeySequence, QPixmap
+from PyQt5.QtCore import Qt, QSize, QUrl
+from PyQt5.QtGui import (
+    QColor, QDesktopServices, QIcon, QImageReader, QKeySequence, QPixmap,
+)
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
@@ -32,9 +34,12 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from . import APP_NAME, __version__, detector as det, export, project, scan, status
+from . import (
+    APP_NAME, __version__, detector as det, export, project, render, scan,
+    settings as prefs, status,
+)
 from .canvas import MODE_DRAW, MODE_SELECT, ImageCanvas, class_color
-from .workers import InferenceWorker, ModelLoadWorker
+from .workers import ImageExportWorker, InferenceWorker, ModelLoadWorker
 
 HINT = "color: #666;"
 OK = "color: #1a7f37; font-weight: bold;"
@@ -73,8 +78,14 @@ class MainWindow(QMainWindow):
         self.dirty = False             # unsaved changes to the project
         self.model_worker = None
         self.infer_worker = None
+        self.image_worker = None
+        self._pending_export = None
+        # Held until the restored model finishes loading, so the summary of what
+        # was restored isn't immediately overwritten by "Model ready".
+        self._restore_note = None
 
         self._build_ui()
+        self._restore_settings()
         self._refresh_title()
         self._update_enabled_state()
 
@@ -88,6 +99,9 @@ class MainWindow(QMainWindow):
         self.canvas.status_message.connect(self._show_status)
         self.canvas.cursor_moved.connect(self._on_cursor_moved)
         self.canvas.edit_blocked.connect(self._on_edit_blocked)
+        # The canvas drops itself back to select mode after a box is drawn, so
+        # the toolbar follows the canvas rather than the other way round.
+        self.canvas.mode_changed.connect(self._sync_mode_buttons)
 
         # Setup steps on the left, image in the middle, live editing aids on the
         # right — so the counts and class list are always visible while working.
@@ -134,6 +148,12 @@ class MainWindow(QMainWindow):
         )
         file_menu.addSeparator()
         file_menu.addAction("Export annotations…", self.export_now, QKeySequence("Ctrl+E"))
+        file_menu.addSeparator()
+        # Mirrored here as well as in the sidebar, so it stays reachable even
+        # when the setup panel is scrolled.
+        self.action_remember = file_menu.addAction("Remember settings for next time")
+        self.action_remember.setCheckable(True)
+        self.action_remember.toggled.connect(self._on_remember_action)
         file_menu.addSeparator()
         file_menu.addAction("Quit", self.close, QKeySequence.Quit)
 
@@ -236,6 +256,14 @@ class MainWindow(QMainWindow):
 
         bar.addAction(self.action_select)
         bar.addAction(self.action_draw)
+
+        self.check_sticky = QCheckBox("Keep drawing")
+        self.check_sticky.setToolTip(
+            "Normally the tool returns to Select after each box you draw. Tick "
+            "this to stay in Draw mode and add several boxes in a row."
+        )
+        self.check_sticky.toggled.connect(self._on_sticky_toggled)
+        bar.addWidget(self.check_sticky)
         bar.addSeparator()
 
         self.action_delete = QAction("Delete box", self)
@@ -303,7 +331,7 @@ class MainWindow(QMainWindow):
 
         for group in (
             self._group_images(), self._group_model(), self._group_output(),
-            self._group_detection(),
+            self._group_detection(), self._group_preferences(),
         ):
             _compact(group)
             layout.addWidget(group)
@@ -325,9 +353,10 @@ class MainWindow(QMainWindow):
         column.addWidget(_compact(self._group_image_list()))
         column.setStretchFactor(0, 0)
         column.setStretchFactor(1, 1)
-        # Headroom on top of the size hint: the folder/model labels wrap to two
-        # lines once real paths are shown, which the hint can't know yet.
-        natural = inner.sizeHint().height() + 56
+        # Headroom on top of the size hint: the folder and model labels each
+        # wrap to two or three lines once real paths are shown, which the hint
+        # can't know while they still say "No folder chosen".
+        natural = inner.sizeHint().height() + 120
         column.setSizes([natural, max(200, 900 - natural)])
         area.setMinimumHeight(180)      # but the user can still shrink it
         return column
@@ -413,6 +442,24 @@ class MainWindow(QMainWindow):
         self.check_yolo = QCheckBox(f"YOLO labels  ({export.YOLO_DIRNAME}/)")
         self.check_yolo.setToolTip("One .txt per image in YOLO format, plus classes.txt")
 
+        self.check_images = QCheckBox("Annotated images")
+        self.check_images.setChecked(True)
+        self.check_images.setToolTip(
+            f"A copy of each annotated plate with the boxes and labels drawn "
+            f"on, written to {export.IMAGES_DIRNAME}/ — for checking counts "
+            f"without the app.\n\nSaved at full resolution, so a whole-plate "
+            f"photo comes out around 25 MB and takes a second or two. This is "
+            f"the slowest and largest part of an export; untick it to skip."
+        )
+
+        note = QLabel(f"Each export gets its own {export.EXPORT_PREFIX}_… folder.")
+        note.setWordWrap(True)
+        note.setStyleSheet(HINT)
+        note.setToolTip(
+            "Exports are never written loose into the folder you chose, and a "
+            "re-export never overwrites earlier results."
+        )
+
         self.button_export = QPushButton("Export now")
         self.button_export.setToolTip("Write the selected outputs (Ctrl/Cmd+E)")
         self.button_export.clicked.connect(self.export_now)
@@ -421,7 +468,23 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.label_output)
         layout.addWidget(self.check_csv)
         layout.addWidget(self.check_yolo)
+        layout.addWidget(self.check_images)
+        layout.addWidget(note)
         layout.addWidget(self.button_export)
+        return group
+
+    def _group_preferences(self):
+        group = QGroupBox("Preferences")
+        layout = QVBoxLayout(group)
+        self.check_remember = QCheckBox("Remember settings for next time")
+        self.check_remember.setChecked(True)
+        self.check_remember.setToolTip(
+            "Reopen with the same folders, model, detection settings and export "
+            "choices next time you start the app. Annotations are not stored "
+            "this way — save a project for those."
+        )
+        self.check_remember.toggled.connect(self._on_remember_toggled)
+        layout.addWidget(self.check_remember)
         return group
 
     def _group_detection(self):
@@ -544,29 +607,34 @@ class MainWindow(QMainWindow):
             return
         if self._load_image_folder(Path(folder)):
             self._mark_dirty()
+            self._save_settings()
 
-    def _load_image_folder(self, folder, keep_records=False):
+    def _load_image_folder(self, folder, keep_records=False, quiet=False):
         """Scan `folder` and show its images. Returns True if it worked.
 
         `keep_records` is set when opening a project, where the annotations for
-        these images have already been restored and must not be wiped.
+        these images have already been restored and must not be wiped. `quiet`
+        suppresses the pop-ups when restoring a remembered folder at startup —
+        nobody wants a dialog before they've even clicked anything.
         """
         try:
             result = scan.scan_folder(folder)
         except OSError as exc:
-            QMessageBox.critical(self, "Cannot read folder", str(exc))
+            if not quiet:
+                QMessageBox.critical(self, "Cannot read folder", str(exc))
             return False
 
-        if result.warning:
+        if result.warning and not quiet:
             QMessageBox.warning(self, "Unsupported image format", result.warning)
 
         if not result.images:
-            QMessageBox.critical(
-                self, "No usable images",
-                f"No .jpg or .png images were found directly inside:\n\n{folder}\n\n"
-                "Subfolders are not searched — point the app at the folder that "
-                "holds the images themselves.",
-            )
+            if not quiet:
+                QMessageBox.critical(
+                    self, "No usable images",
+                    f"No .jpg or .png images were found directly inside:\n\n{folder}\n\n"
+                    "Subfolders are not searched — point the app at the folder that "
+                    "holds the images themselves.",
+                )
             return False
 
         self.image_folder = Path(folder)
@@ -643,7 +711,12 @@ class MainWindow(QMainWindow):
         self.label_model.setStyleSheet("")
         self._set_class_names(detector.class_names)
         self._update_enabled_state()
-        self._show_status(f"Model ready: {detector.path.name}")
+        self._save_settings()
+        if self._restore_note:
+            self._show_status(self._restore_note)
+            self._restore_note = None
+        else:
+            self._show_status(f"Model ready: {detector.path.name}")
 
         if previous and previous != detector.class_names and self.records:
             QMessageBox.warning(
@@ -673,6 +746,7 @@ class MainWindow(QMainWindow):
         self.output_folder = Path(folder)
         self.label_output.setText(f"<b>{self.output_folder.name}</b><br>{self.output_folder}")
         self.label_output.setStyleSheet("")
+        self._save_settings()
         self._update_enabled_state()
 
     # ----------------------------------------------------------- navigation
@@ -969,10 +1043,15 @@ class MainWindow(QMainWindow):
             self._show_status("Cancelled — annotations completed so far were kept.")
 
     def cancel_inference(self):
+        """The one Cancel button serves whichever long job is running."""
         if self.infer_worker:
             self.infer_worker.cancel()
             self.button_cancel.setEnabled(False)
             self._show_status("Cancelling after the current tile…")
+        elif self.image_worker:
+            self.image_worker.cancel()
+            self.button_cancel.setEnabled(False)
+            self._show_status("Cancelling after the current image…")
 
     def clear_current(self):
         if self.index < 0:
@@ -987,6 +1066,96 @@ class MainWindow(QMainWindow):
         )
         if answer == QMessageBox.Yes:
             self.canvas.clear_boxes()
+
+    # ------------------------------------------------------------- settings
+
+    def _save_settings(self):
+        """Remember the current setup, if the user asked us to."""
+        remember = self.check_remember.isChecked()
+        prefs.save({
+            "image_folder": str(self.image_folder) if self.image_folder else None,
+            "model_path": str(self.detector.path) if self.detector else None,
+            "output_folder": str(self.output_folder) if self.output_folder else None,
+            "conf": self.spin_conf.value(),
+            "tiling": self.check_tiling.isChecked(),
+            "tile_size": self.spin_tile.value(),
+            "tile_overlap": self.spin_overlap.value(),
+            "export_csv": self.check_csv.isChecked(),
+            "export_yolo": self.check_yolo.isChecked(),
+            "export_images": self.check_images.isChecked(),
+            "show_labels": self.check_labels.isChecked(),
+            "show_confidence": self.check_conf.isChecked(),
+            "sticky_draw": self.check_sticky.isChecked(),
+        }, remember=remember)
+
+    def _restore_settings(self):
+        """Reapply the last session's setup. Annotations are never restored."""
+        remember = prefs.remembering()
+        for widget in (self.check_remember, self.action_remember):
+            widget.blockSignals(True)
+            widget.setChecked(remember)
+            widget.blockSignals(False)
+
+        values = prefs.load()
+        if not values:
+            return
+
+        self.spin_conf.setValue(prefs.get_float(values, "conf", det.DEFAULT_CONF))
+        self.check_tiling.setChecked(prefs.get_bool(values, "tiling", True))
+        self.spin_tile.setValue(
+            prefs.get_int(values, "tile_size", det.DEFAULT_TILE_SIZE)
+        )
+        self.spin_overlap.setValue(
+            prefs.get_float(values, "tile_overlap", det.DEFAULT_TILE_OVERLAP)
+        )
+        self.check_csv.setChecked(prefs.get_bool(values, "export_csv", True))
+        self.check_yolo.setChecked(prefs.get_bool(values, "export_yolo", False))
+        self.check_images.setChecked(prefs.get_bool(values, "export_images", True))
+        self.check_labels.setChecked(prefs.get_bool(values, "show_labels", True))
+        self.check_conf.setChecked(prefs.get_bool(values, "show_confidence", False))
+        self.check_sticky.setChecked(prefs.get_bool(values, "sticky_draw", False))
+
+        restored, missing = [], []
+
+        output = prefs.get_str(values, "output_folder")
+        if output and Path(output).is_dir():
+            self.output_folder = Path(output)
+            self.label_output.setText(
+                f"<b>{self.output_folder.name}</b><br>{self.output_folder}"
+            )
+            self.label_output.setStyleSheet("")
+            restored.append("output folder")
+        elif output:
+            missing.append("output folder")
+
+        folder = prefs.get_str(values, "image_folder")
+        if folder and Path(folder).is_dir():
+            if self._load_image_folder(Path(folder), quiet=True):
+                restored.append(f"{len(self.images)} image(s)")
+        elif folder:
+            missing.append("image folder")
+
+        model = prefs.get_str(values, "model_path")
+        if model and Path(model).is_file():
+            self._load_model(model)
+            restored.append("model")
+        elif model:
+            missing.append("model")
+
+        self.dirty = False
+        self._refresh_title()
+        if restored:
+            note = "Restored " + ", ".join(restored)
+            if missing:
+                note += f" · could not find the previous {', '.join(missing)}"
+            note += ". Annotations are not restored — open a project for those."
+            self._show_status(note)
+            if "model" in restored:
+                self._restore_note = note   # re-shown once the model has loaded
+        elif missing:
+            self._show_status(
+                f"The previous {', '.join(missing)} could not be found — choose again."
+            )
 
     # -------------------------------------------------------------- projects
 
@@ -1180,30 +1349,28 @@ class MainWindow(QMainWindow):
             return
         want_csv = self.check_csv.isChecked()
         want_yolo = self.check_yolo.isChecked()
-        if not (want_csv or want_yolo):
+        want_images = self.check_images.isChecked()
+        if not (want_csv or want_yolo or want_images):
             QMessageBox.information(
                 self, "Nothing selected",
-                "Tick at least one output format — the count summary, YOLO "
-                "labels, or both.",
+                "Tick at least one output — the count summary, YOLO labels, "
+                "annotated images, or any combination.",
             )
             return
 
         self._store_current()
-
-        existing = export.existing_targets(self.output_folder, want_csv, want_yolo)
-        if existing:
-            listing = "\n".join(f"    {p.name}" for p in existing)
-            answer = QMessageBox.question(
-                self, "Overwrite existing files?",
-                f"These already exist in {self.output_folder} and will be "
-                f"overwritten:\n\n{listing}",
-                QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel,
-            )
-            if answer != QMessageBox.Yes:
-                return
-
         if want_yolo:
             self._ensure_image_sizes()
+
+        try:
+            folder = export.make_export_dir(self.output_folder)
+        except OSError as exc:
+            QMessageBox.critical(
+                self, "Export failed",
+                f"Could not create an export folder inside "
+                f"{self.output_folder}:\n\n{exc}",
+            )
+            return
 
         class_names = (
             self.detector.class_names if self.detector
@@ -1213,16 +1380,13 @@ class MainWindow(QMainWindow):
         written = []
         try:
             if want_csv:
-                written.append(
-                    export.write_csv(
-                        self.output_folder, image_names, class_names, self.records
-                    )
-                )
+                export.write_csv(folder, image_names, class_names, self.records)
+                written.append(export.CSV_NAME)
             if want_yolo:
-                target, count = export.write_yolo(
-                    self.output_folder, class_names, self.records, self.image_sizes
+                _, count = export.write_yolo(
+                    folder, class_names, self.records, self.image_sizes
                 )
-                written.append(f"{target}  ({count} label file(s))")
+                written.append(f"{export.YOLO_DIRNAME}/  ({count} label file(s))")
                 expected = sum(1 for r in self.records.values() if r.get("annotated"))
                 if count < expected:
                     QMessageBox.warning(
@@ -1231,35 +1395,119 @@ class MainWindow(QMainWindow):
                         "written as YOLO labels because their pixel dimensions "
                         "could not be read. The count summary is unaffected.",
                     )
-            # Always alongside the data: what was exported, when, by which
-            # model, with which detection settings.
-            info = export.write_run_info(
-                self.output_folder,
+        except OSError as exc:
+            QMessageBox.critical(self, "Export failed", str(exc))
+            return
+
+        self._pending_export = {
+            "folder": folder,
+            "written": written,
+            "class_names": class_names,
+            "image_names": image_names,
+        }
+        self._save_settings()
+
+        if want_images:
+            self._export_annotated_images(folder, class_names)
+        else:
+            self._finish_export()
+
+    def _export_annotated_images(self, folder, class_names):
+        """Render the annotated plates in the background, then finish the export."""
+        jobs = []
+        target = export.images_dir(folder)
+        for path in self.images:
+            record = self.records.get(path.name)
+            if not record or not record.get("annotated"):
+                continue
+            jobs.append((path, target / render.output_name(path.name), record["boxes"]))
+
+        if not jobs:
+            self._finish_export()
+            return
+
+        target.mkdir(parents=True, exist_ok=True)
+        self._set_busy(True, f"Drawing annotations onto {len(jobs)} image(s)…")
+        self.progress.setVisible(True)
+        self.progress.setRange(0, len(jobs))
+        self.progress.setValue(0)
+        self.button_cancel.setVisible(True)
+
+        self.image_worker = ImageExportWorker(
+            jobs, class_names, self.check_conf.isChecked(), self
+        )
+        self.image_worker.progress.connect(self._on_image_export_progress)
+        self.image_worker.finished_all.connect(self._on_images_exported)
+        self.image_worker.start()
+
+    def _on_image_export_progress(self, done, total, name):
+        self.progress.setValue(done)
+        self.progress.setFormat("image %v of %m")
+        self._show_status(f"Drawing annotations onto {name} ({done} of {total})…")
+
+    def _on_images_exported(self, written, errors):
+        self._set_busy(False)
+        self.progress.setVisible(False)
+        self.button_cancel.setVisible(False)
+        self.image_worker = None
+        if written:
+            self._pending_export["written"].append(
+                f"{export.IMAGES_DIRNAME}/  ({written} image(s))"
+            )
+        if errors:
+            QMessageBox.warning(
+                self, "Some annotated images were not written",
+                f"{len(errors)} image(s) could not be saved:\n\n"
+                + "\n".join(f"    {e}" for e in errors[:8])
+                + ("\n    …" if len(errors) > 8 else ""),
+            )
+        self._finish_export()
+
+    def _finish_export(self):
+        """Write the run log last, so it can list everything that was produced."""
+        pending, self._pending_export = self._pending_export, None
+        folder = pending["folder"]
+        try:
+            export.write_run_info(
+                folder,
                 app_version=__version__,
                 project_path=self.project_path,
                 image_folder=self.image_folder,
-                image_names=image_names,
+                image_names=pending["image_names"],
                 records=self.records,
-                class_names=class_names,
+                class_names=pending["class_names"],
                 model_info=(
                     {"path": str(self.detector.path), "task": self.detector.task}
                     if self.detector else None
                 ),
                 current_settings=self._detection_settings(),
-                outputs_written=[str(w) for w in written],
+                outputs_written=pending["written"],
             )
-            written.append(info)
         except OSError as exc:
             QMessageBox.critical(self, "Export failed", str(exc))
             return
 
         annotated = sum(1 for r in self.records.values() if r.get("annotated"))
-        QMessageBox.information(
-            self, "Export complete",
-            f"{annotated} of {len(self.images)} image(s) annotated.\n\nWrote:\n"
-            + "\n".join(f"    {w}" for w in written),
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle("Export complete")
+        box.setText(f"Exported to <b>{folder.name}</b>")
+        box.setInformativeText(
+            f"{annotated} of {len(self.images)} image(s) annotated.\n\n"
+            f"In {folder}:\n"
+            + "\n".join(f"    {w}" for w in pending["written"])
+            + f"\n    {export.INFO_NAME}"
         )
-        self._show_status(f"Exported to {self.output_folder}")
+        reveal = box.addButton("Show in Finder", QMessageBox.ActionRole)
+        box.addButton(QMessageBox.Ok)
+        box.exec_()
+        if box.clickedButton() is reveal:
+            self._reveal(folder)
+        self._show_status(f"Exported to {folder}")
+
+    @staticmethod
+    def _reveal(path):
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def _ensure_image_sizes(self):
         """YOLO labels are normalised, so every annotated image needs its size.
@@ -1283,13 +1531,42 @@ class MainWindow(QMainWindow):
 
     def _set_mode(self, mode):
         self.canvas.set_mode(mode)
-        self.action_select.setChecked(mode == MODE_SELECT)
-        self.action_draw.setChecked(mode == MODE_DRAW)
+        self._sync_mode_buttons(mode)
         self._show_status(
             "Draw mode — drag on the image to add a box"
             if mode == MODE_DRAW
             else "Select mode — click a box to edit it, drag empty space to pan"
         )
+
+    def _sync_mode_buttons(self, mode):
+        """Reflect the canvas's mode in the toolbar without re-triggering it."""
+        for action, wanted in (
+            (self.action_select, MODE_SELECT), (self.action_draw, MODE_DRAW),
+        ):
+            action.blockSignals(True)
+            action.setChecked(mode == wanted)
+            action.blockSignals(False)
+
+    def _on_sticky_toggled(self, on):
+        self.canvas.sticky_draw = on
+        self._show_status(
+            "Draw mode will stay on after each box"
+            if on else "Draw mode returns to Select after each box"
+        )
+
+    def _on_remember_toggled(self, on):
+        self.action_remember.blockSignals(True)
+        self.action_remember.setChecked(on)
+        self.action_remember.blockSignals(False)
+        self._save_settings()
+        self._show_status(
+            "Settings will be restored next time you start the app"
+            if on else "Settings will not be remembered"
+        )
+
+    def _on_remember_action(self, on):
+        """The menu item and the sidebar checkbox are the same setting."""
+        self.check_remember.setChecked(on)
 
     def _toggle_labels(self, on):
         self.canvas.show_labels = on
@@ -1457,11 +1734,13 @@ class MainWindow(QMainWindow):
         return True
 
     def closeEvent(self, event):
-        if self.infer_worker:
-            self.infer_worker.cancel()
-            self.infer_worker.wait(5000)
+        for worker in (self.infer_worker, self.image_worker):
+            if worker:
+                worker.cancel()
+                worker.wait(5000)
         if not self._confirm_discard("Quitting"):
             event.ignore()
             return
+        self._save_settings()
         self.canvas.shutdown()
         event.accept()

@@ -104,7 +104,8 @@ def verify(model=None):
 if __name__ == "__main__":
     args = sys.argv[1:]
     model = None
-    for candidate in (HERE / "nuc" / "best.pt",):
+    # A model to exercise in the self-test, if one is sitting in the repo.
+    for candidate in (HERE.parent / "nuc" / "best.pt",):
         if candidate.is_file():
             model = candidate
             break

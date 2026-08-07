@@ -9,6 +9,22 @@ Interaction model, deliberately close to LabelImg/CVAT:
     Wheel                   zoom about the cursor.
     Middle-drag / Space     pan in any mode.
     1..9                    set the class of the selected box.
+
+Design note — why the view does all the work
+--------------------------------------------
+`BoxItem` is a plain rectangle: its `boundingRect()` and `shape()` are pure
+functions of its own rect and never consult the view. Everything that needs to
+be a constant size on screen regardless of zoom — the selection handles and the
+class labels — is drawn by the view in `drawForeground()`, in device
+coordinates, and hit-tested there too.
+
+That split is not cosmetic. QGraphicsScene caches every item's bounding rect in
+its spatial index, and an item whose `boundingRect()` silently changes (for
+instance because it scaled a handle margin by the current zoom) corrupts that
+index. `QGraphicsView::scale()` dispatches a synthetic mouse-move *while* the
+transform is being applied, so the corrupted index is walked immediately and the
+process segfaults inside `QGraphicsScene::mouseMoveEvent`. Keep item geometry
+independent of the view.
 """
 
 from PyQt5.QtCore import QPointF, QRectF, Qt, pyqtSignal
@@ -17,6 +33,7 @@ from PyQt5.QtGui import (
     QFont,
     QFontMetrics,
     QPainter,
+    QPainterPath,
     QPen,
     QPixmap,
 )
@@ -35,11 +52,15 @@ CLASS_COLORS = [
 ]
 
 HANDLE_PX = 9.0          # on-screen handle size, constant at any zoom
+GRAB_SLOP_PX = 3.0       # extra forgiveness when grabbing a handle
 MIN_BOX_PX = 4.0         # smaller drags are treated as a stray click
 LABEL_MIN_WIDTH_PX = 26  # hide labels on boxes too small to read them on
+ITEM_PAD = 2.0           # constant bounding-rect padding, in image pixels
 
 MODE_SELECT = "select"
 MODE_DRAW = "draw"
+
+HANDLE_KEYS = ("tl", "tr", "bl", "br", "t", "b", "l", "r")
 
 _HANDLE_CURSORS = {
     "tl": Qt.SizeFDiagCursor, "br": Qt.SizeFDiagCursor,
@@ -54,22 +75,18 @@ def class_color(cls_id):
 
 
 class BoxItem(QGraphicsRectItem):
-    """One bounding box. Item coordinates are image pixel coordinates."""
+    """One bounding box. Item coordinates are image pixel coordinates.
+
+    Geometry depends only on `rect()` — see the module docstring.
+    """
 
     def __init__(self, rect, cls_id, canvas, conf=None):
         super().__init__(rect)
         self.cls_id = cls_id
         self.conf = conf
         self.canvas = canvas
-        self._grab = None          # which handle is being dragged, or "move"
-        self._grab_origin = None
-        self._grab_rect = None
-        self._hover = False
-        self.setAcceptHoverEvents(True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.refresh_z()
-
-    # -- geometry ----------------------------------------------------------
 
     def refresh_z(self):
         """Small boxes sit on top, so a colony inside a clump stays clickable."""
@@ -77,208 +94,35 @@ class BoxItem(QGraphicsRectItem):
         area = max(1.0, r.width() * r.height())
         self.setZValue(10.0 + 1e7 / area)
 
-    def _scale(self):
-        scene = self.scene()
-        views = scene.views() if scene else []
-        if not views:
-            return 1.0
-        return views[0].transform().m11() or 1.0
-
-    def _handle_size(self):
-        return HANDLE_PX / self._scale()
-
-    def _handle_rects(self):
-        s = self._handle_size()
-        r = self.rect()
-        cx, cy = r.center().x(), r.center().y()
-        points = {
-            "tl": QPointF(r.left(), r.top()), "tr": QPointF(r.right(), r.top()),
-            "bl": QPointF(r.left(), r.bottom()), "br": QPointF(r.right(), r.bottom()),
-            "t": QPointF(cx, r.top()), "b": QPointF(cx, r.bottom()),
-            "l": QPointF(r.left(), cy), "r": QPointF(r.right(), cy),
-        }
-        return {
-            key: QRectF(p.x() - s / 2, p.y() - s / 2, s, s)
-            for key, p in points.items()
-        }
+    # -- geometry: constant, never a function of the view ------------------
 
     def boundingRect(self):
-        margin = self._handle_size()
-        return self.rect().normalized().adjusted(-margin, -margin, margin, margin)
+        return self.rect().normalized().adjusted(
+            -ITEM_PAD, -ITEM_PAD, ITEM_PAD, ITEM_PAD
+        )
 
     def shape(self):
-        from PyQt5.QtGui import QPainterPath
-
         path = QPainterPath()
         path.addRect(self.rect().normalized())
-        if self.isSelected():
-            for handle in self._handle_rects().values():
-                path.addRect(handle)
         return path
 
-    # -- painting ----------------------------------------------------------
+    # -- painting: just the rectangle; labels/handles are the view's job ---
 
     def paint(self, painter, option, widget=None):
         color = class_color(self.cls_id)
         selected = self.isSelected()
-        rect = self.rect().normalized()
 
         pen = QPen(color)
         pen.setCosmetic(True)              # constant line width at any zoom
         pen.setWidth(3 if selected else 2)
         painter.setPen(pen)
-        if selected or self._hover:
+        if selected:
             fill = QColor(color)
-            fill.setAlpha(55 if selected else 30)
+            fill.setAlpha(55)
             painter.setBrush(fill)
         else:
             painter.setBrush(Qt.NoBrush)
-        painter.drawRect(rect)
-
-        transform = painter.transform()
-        width_px = rect.width() * self._scale()
-
-        if self.canvas.show_labels and (selected or width_px >= LABEL_MIN_WIDTH_PX):
-            self._paint_label(painter, transform, rect, color)
-
-        if selected:
-            painter.setBrush(QColor("#ffffff"))
-            handle_pen = QPen(color)
-            handle_pen.setCosmetic(True)
-            handle_pen.setWidth(2)
-            painter.setPen(handle_pen)
-            for handle in self._handle_rects().values():
-                painter.drawRect(handle)
-
-    def _paint_label(self, painter, transform, rect, color):
-        """Draw the label in device space so it stays legible at any zoom."""
-        text = self.canvas.class_name(self.cls_id)
-        if self.canvas.show_confidence and self.conf is not None:
-            text = f"{text} {self.conf:.2f}"
-
-        anchor = transform.map(rect.topLeft())
-        painter.save()
-        painter.resetTransform()
-
-        font = QFont(painter.font())
-        font.setPointSizeF(10.0)
-        font.setBold(True)
-        painter.setFont(font)
-        metrics = QFontMetrics(font)
-        pad = 3
-        box_w = metrics.horizontalAdvance(text) + 2 * pad
-        box_h = metrics.height() + 2 * pad
-
-        x = anchor.x()
-        y = anchor.y() - box_h - 1
-        if y < 0:                         # box is at the top edge: label inside
-            y = anchor.y() + 1
-        background = QRectF(x, y, box_w, box_h)
-
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(color)
-        painter.drawRect(background)
-        painter.setPen(QPen(QColor("#ffffff")))
-        painter.drawText(background.adjusted(pad, pad, -pad, -pad), Qt.AlignLeft | Qt.AlignVCenter, text)
-        painter.restore()
-
-    # -- mouse -------------------------------------------------------------
-
-    def _handle_at(self, pos):
-        if not self.isSelected():
-            return None
-        for key, handle in self._handle_rects().items():
-            if handle.contains(pos):
-                return key
-        return None
-
-    def hoverEnterEvent(self, event):
-        self._hover = True
-        self.update()
-        super().hoverEnterEvent(event)
-
-    def hoverLeaveEvent(self, event):
-        self._hover = False
-        self.setCursor(Qt.ArrowCursor)
-        self.update()
-        super().hoverLeaveEvent(event)
-
-    def hoverMoveEvent(self, event):
-        handle = self._handle_at(event.pos())
-        if handle:
-            self.setCursor(_HANDLE_CURSORS[handle])
-        elif self.canvas.mode == MODE_SELECT:
-            self.setCursor(Qt.SizeAllCursor)
-        else:
-            self.setCursor(Qt.CrossCursor)
-        super().hoverMoveEvent(event)
-
-    def mousePressEvent(self, event):
-        if event.button() != Qt.LeftButton or self.canvas.mode != MODE_SELECT:
-            event.ignore()
-            return
-        self.scene().clearSelection()
-        self.setSelected(True)
-        if self.canvas.locked:
-            # Selecting a box on a finalized image is fine; moving it is not.
-            self.canvas.edit_blocked.emit()
-            event.accept()
-            return
-        self._grab = self._handle_at(event.pos()) or "move"
-        self._grab_origin = event.scenePos()
-        self._grab_rect = QRectF(self.rect())
-        event.accept()
-
-    def mouseMoveEvent(self, event):
-        if not self._grab:
-            return
-        delta = event.scenePos() - self._grab_origin
-        rect = QRectF(self._grab_rect)
-
-        if self._grab == "move":
-            rect.translate(delta)
-            bounds = self.canvas.image_rect()
-            # keep a moved box fully inside the image
-            if rect.left() < 0:
-                rect.translate(-rect.left(), 0)
-            if rect.top() < 0:
-                rect.translate(0, -rect.top())
-            if rect.right() > bounds.width():
-                rect.translate(bounds.width() - rect.right(), 0)
-            if rect.bottom() > bounds.height():
-                rect.translate(0, bounds.height() - rect.bottom())
-        else:
-            if "l" in self._grab:
-                rect.setLeft(rect.left() + delta.x())
-            if "r" in self._grab:
-                rect.setRight(rect.right() + delta.x())
-            if "t" in self._grab:
-                rect.setTop(rect.top() + delta.y())
-            if "b" in self._grab:
-                rect.setBottom(rect.bottom() + delta.y())
-            rect = rect.normalized().intersected(self.canvas.image_rect())
-
-        self.setRect(rect)
-        self.canvas.box_geometry_preview(self)
-        event.accept()
-
-    def mouseReleaseEvent(self, event):
-        if not self._grab:
-            return
-        self._grab = None
-        rect = self.rect().normalized().intersected(self.canvas.image_rect())
-        if rect.width() < 1 or rect.height() < 1:
-            rect = self._grab_rect          # degenerate drag: undo it
-        self.setRect(rect)
-        self.refresh_z()
-        self.canvas.notify_boxes_changed(user_edit=True)
-        event.accept()
-
-    def mouseDoubleClickEvent(self, event):
-        self.canvas.prompt_class_change(self)
-        event.accept()
-
-    # -- data --------------------------------------------------------------
+        painter.drawRect(self.rect().normalized())
 
     def to_dict(self):
         r = self.rect().normalized()
@@ -293,12 +137,13 @@ class ImageCanvas(QGraphicsView):
     """Displays one image and its boxes, and lets the user edit them."""
 
     boxes_changed = pyqtSignal()
-    user_edited = pyqtSignal()          # only for changes the user made by hand
+    user_edited = pyqtSignal()           # only for changes the user made by hand
     selection_changed = pyqtSignal()
     status_message = pyqtSignal(str)
     cursor_moved = pyqtSignal(float, float)
     zoom_changed = pyqtSignal(float)
-    edit_blocked = pyqtSignal()         # an edit was attempted on a locked image
+    edit_blocked = pyqtSignal()          # an edit was attempted on a locked image
+    mode_changed = pyqtSignal(str)       # so the toolbar can follow the canvas
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -318,11 +163,19 @@ class ImageCanvas(QGraphicsView):
         self.show_labels = True
         self.show_confidence = False
         self.locked = False        # set for images the user marked as finalized
+        # Drawing is one-shot by default: after a box is drawn the canvas drops
+        # back to select mode, so the very next click edits instead of drawing
+        # another box by accident. Tick "Keep drawing" to add several in a row.
+        self.sticky_draw = False
 
         self._pixmap_item = None
         self._image_size = (0, 0)
         self._draft = None          # rubber-band box being drawn
         self._draft_origin = None
+        self._drag_item = None      # box being moved/resized
+        self._drag_mode = None      # "move" or a handle key
+        self._drag_origin = None    # scene pos where the drag started
+        self._drag_rect = None      # the box's rect when the drag started
         self._panning = False
         self._pan_origin = None
         self._space_held = False
@@ -345,6 +198,7 @@ class ImageCanvas(QGraphicsView):
         self._scene.clear()
         self._pixmap_item = None
         self._draft = None
+        self._drag_item = None
 
     # -- setup -------------------------------------------------------------
 
@@ -369,9 +223,9 @@ class ImageCanvas(QGraphicsView):
 
     def load_image(self, path):
         pixmap = QPixmap(str(path))
+        self._cancel_interaction()
         self._scene.clear()
         self._pixmap_item = None
-        self._draft = None
         if pixmap.isNull():
             self._image_size = (0, 0)
             self._scene.setSceneRect(QRectF(0, 0, 1, 1))
@@ -384,15 +238,20 @@ class ImageCanvas(QGraphicsView):
         return True
 
     def clear_image(self):
+        self._cancel_interaction()
         self._scene.clear()
         self._pixmap_item = None
-        self._draft = None
         self._image_size = (0, 0)
 
-    # -- boxes -------------------------------------------------------------
+    def _cancel_interaction(self):
+        """Drop any in-progress drag, so nothing refers to a removed item."""
+        self._draft = None
+        self._draft_origin = None
+        self._drag_item = None
+        self._drag_mode = None
+        self._panning = False
 
-    def box_items(self):
-        return [i for i in self._scene.items() if isinstance(i, BoxItem)]
+    # -- boxes -------------------------------------------------------------
 
     def locked_out(self):
         """True if this image is finalized, so edits must be refused."""
@@ -401,12 +260,16 @@ class ImageCanvas(QGraphicsView):
             return True
         return False
 
+    def box_items(self):
+        return [i for i in self._scene.items() if isinstance(i, BoxItem)]
+
     def set_boxes(self, boxes):
         """Replace the boxes programmatically (model output, project load).
 
         Deliberately does not count as a user edit, and is allowed even on a
         locked image so a project can be reloaded.
         """
+        self._cancel_interaction()
         for item in self.box_items():
             self._scene.removeItem(item)
         for box in boxes:
@@ -438,6 +301,8 @@ class ImageCanvas(QGraphicsView):
         removed = 0
         for item in self._scene.selectedItems():
             if isinstance(item, BoxItem):
+                if item is self._drag_item:
+                    self._drag_item = None
                 self._scene.removeItem(item)
                 removed += 1
         if removed:
@@ -448,6 +313,7 @@ class ImageCanvas(QGraphicsView):
     def clear_boxes(self):
         if self.locked_out():
             return 0
+        self._cancel_interaction()
         count = 0
         for item in self.box_items():
             self._scene.removeItem(item)
@@ -525,51 +391,33 @@ class ImageCanvas(QGraphicsView):
     def _delete_item(self, item):
         if self.locked_out():
             return
+        if item is self._drag_item:
+            self._drag_item = None
         self._scene.removeItem(item)
         self.notify_boxes_changed(user_edit=True)
 
     # -- modes and zoom ----------------------------------------------------
 
     def set_mode(self, mode):
+        changed = mode != self.mode
         self.mode = mode
         if mode == MODE_DRAW:
             self.viewport().setCursor(Qt.CrossCursor)
             self._scene.clearSelection()
         else:
             self.viewport().setCursor(Qt.ArrowCursor)
+        if changed:
+            self.mode_changed.emit(mode)
 
     def set_active_class(self, cls_id):
         self.active_class = cls_id
 
     def set_locked(self, locked):
         self.locked = bool(locked)
+        if self.locked:
+            self._drag_item = None
+            self._draft = None
         self.viewport().update()
-
-    def drawForeground(self, painter, rect):
-        """A badge in the corner, so a locked image is obvious while editing."""
-        super().drawForeground(painter, rect)
-        if not (self.locked and self.has_image()):
-            return
-        text = "FINALIZED — locked"
-        painter.save()
-        painter.resetTransform()
-        font = QFont(painter.font())
-        font.setPointSizeF(11.0)
-        font.setBold(True)
-        painter.setFont(font)
-        metrics = QFontMetrics(font)
-        pad = 8
-        box = QRectF(
-            10, 10,
-            metrics.horizontalAdvance(text) + 2 * pad,
-            metrics.height() + 2 * pad,
-        )
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(31, 79, 216, 225))
-        painter.drawRoundedRect(box, 5, 5)
-        painter.setPen(QPen(QColor("#ffffff")))
-        painter.drawText(box, Qt.AlignCenter, text)
-        painter.restore()
 
     def fit_to_window(self):
         if not self.has_image():
@@ -599,15 +447,130 @@ class ImageCanvas(QGraphicsView):
         self._after_zoom()
 
     def _after_zoom(self):
-        # Handles and labels are sized in screen pixels, so their bounding rects
-        # change with the zoom level.
-        for item in self.box_items():
-            item.prepareGeometryChange()
+        # Item geometry is zoom-independent, so nothing needs invalidating —
+        # only the foreground (handles, labels) has to be repainted.
         self.viewport().update()
         self.zoom_changed.emit(self.zoom_percent())
 
     def zoom_percent(self):
         return self.transform().m11() * 100.0
+
+    # -- foreground: labels, handles and the locked badge ------------------
+
+    def _device_rect(self, item):
+        return self.viewportTransform().mapRect(item.rect().normalized())
+
+    @staticmethod
+    def _handle_rects(device_rect, slop=0.0):
+        size = HANDLE_PX + 2 * slop
+        cx, cy = device_rect.center().x(), device_rect.center().y()
+        points = {
+            "tl": (device_rect.left(), device_rect.top()),
+            "tr": (device_rect.right(), device_rect.top()),
+            "bl": (device_rect.left(), device_rect.bottom()),
+            "br": (device_rect.right(), device_rect.bottom()),
+            "t": (cx, device_rect.top()),
+            "b": (cx, device_rect.bottom()),
+            "l": (device_rect.left(), cy),
+            "r": (device_rect.right(), cy),
+        }
+        return {
+            key: QRectF(x - size / 2, y - size / 2, size, size)
+            for key, (x, y) in points.items()
+        }
+
+    def drawForeground(self, painter, rect):
+        super().drawForeground(painter, rect)
+        if not self.has_image():
+            return
+
+        viewport_rect = QRectF(self.viewport().rect())
+        painter.save()
+        painter.resetTransform()          # device (viewport) coordinates
+
+        font = QFont(painter.font())
+        font.setPointSizeF(10.0)
+        font.setBold(True)
+        painter.setFont(font)
+        metrics = QFontMetrics(font)
+
+        for item in self.box_items():
+            device = self._device_rect(item)
+            if not device.intersects(viewport_rect):
+                continue
+            selected = item.isSelected()
+            color = class_color(item.cls_id)
+
+            if self.show_labels and (selected or device.width() >= LABEL_MIN_WIDTH_PX):
+                self._draw_label(painter, metrics, item, device, color)
+            if selected:
+                self._draw_handles(painter, device, color)
+
+        if self.locked:
+            self._draw_locked_badge(painter, metrics)
+        painter.restore()
+
+    def _draw_label(self, painter, metrics, item, device, color):
+        text = self.class_name(item.cls_id)
+        if self.show_confidence and item.conf is not None:
+            text = f"{text} {item.conf:.2f}"
+
+        pad = 3
+        box = QRectF(
+            device.left(), device.top() - metrics.height() - 2 * pad - 1,
+            metrics.horizontalAdvance(text) + 2 * pad,
+            metrics.height() + 2 * pad,
+        )
+        if box.top() < 0:                 # box is at the top edge: label inside
+            box.moveTop(device.top() + 1)
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(color)
+        painter.drawRect(box)
+        painter.setPen(QPen(QColor("#ffffff")))
+        painter.drawText(
+            box.adjusted(pad, pad, -pad, -pad), Qt.AlignLeft | Qt.AlignVCenter, text
+        )
+
+    def _draw_handles(self, painter, device, color):
+        pen = QPen(color)
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.setBrush(QColor("#ffffff"))
+        for handle in self._handle_rects(device).values():
+            painter.drawRect(handle)
+
+    def _draw_locked_badge(self, painter, metrics):
+        text = "FINALIZED — locked"
+        pad = 8
+        box = QRectF(
+            10, 10,
+            metrics.horizontalAdvance(text) + 2 * pad,
+            metrics.height() + 2 * pad,
+        )
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(31, 79, 216, 225))
+        painter.drawRoundedRect(box, 5, 5)
+        painter.setPen(QPen(QColor("#ffffff")))
+        painter.drawText(box, Qt.AlignCenter, text)
+
+    # -- hit testing -------------------------------------------------------
+
+    def _handle_at(self, pos):
+        """(item, handle key) if `pos` is on a handle of a selected box."""
+        point = QPointF(pos)
+        for item in self._scene.selectedItems():
+            if not isinstance(item, BoxItem):
+                continue
+            device = self._device_rect(item)
+            for key, handle in self._handle_rects(device, GRAB_SLOP_PX).items():
+                if handle.contains(point):
+                    return item, key
+        return None, None
+
+    def _box_at(self, pos):
+        item = self.itemAt(pos)
+        return item if isinstance(item, BoxItem) else None
 
     # -- events ------------------------------------------------------------
 
@@ -631,7 +594,10 @@ class ImageCanvas(QGraphicsView):
             event.accept()
             return
 
-        if event.button() == Qt.LeftButton and self.mode == MODE_DRAW:
+        if event.button() != Qt.LeftButton:
+            return super().mousePressEvent(event)
+
+        if self.mode == MODE_DRAW:
             if self.locked_out():
                 event.accept()
                 return
@@ -643,16 +609,39 @@ class ImageCanvas(QGraphicsView):
             event.accept()
             return
 
-        if event.button() == Qt.LeftButton:
-            item = self.itemAt(event.pos())
-            if not isinstance(item, BoxItem):
-                # Empty space in select mode: pan, and drop the selection.
-                self._scene.clearSelection()
-                self._start_pan(event.pos())
-                event.accept()
-                return
+        # Select mode: a handle of an already-selected box wins over the box
+        # itself, since handles straddle the border.
+        item, handle = self._handle_at(event.pos())
+        if item is not None:
+            if self.locked:
+                self.edit_blocked.emit()
+            else:
+                self._begin_drag(item, handle, event.pos())
+            event.accept()
+            return
 
-        super().mousePressEvent(event)
+        box = self._box_at(event.pos())
+        if box is not None:
+            self._scene.clearSelection()
+            box.setSelected(True)
+            if self.locked:
+                # Selecting on a finalized image is fine; moving is not.
+                self.edit_blocked.emit()
+            else:
+                self._begin_drag(box, "move", event.pos())
+            event.accept()
+            return
+
+        # Empty space: drop the selection and pan.
+        self._scene.clearSelection()
+        self._start_pan(event.pos())
+        event.accept()
+
+    def _begin_drag(self, item, mode, pos):
+        self._drag_item = item
+        self._drag_mode = mode
+        self._drag_origin = self.mapToScene(pos)
+        self._drag_rect = QRectF(item.rect())
 
     def mouseMoveEvent(self, event):
         if self.has_image():
@@ -668,6 +657,11 @@ class ImageCanvas(QGraphicsView):
             event.accept()
             return
 
+        if self._drag_item is not None:
+            self._update_drag(self.mapToScene(event.pos()))
+            event.accept()
+            return
+
         if self._draft is not None:
             current = self.mapToScene(event.pos())
             rect = QRectF(self._draft_origin, current).normalized()
@@ -676,7 +670,51 @@ class ImageCanvas(QGraphicsView):
             event.accept()
             return
 
+        self._update_cursor(event.pos())
         super().mouseMoveEvent(event)
+
+    def _update_cursor(self, pos):
+        if self.mode == MODE_DRAW:
+            self.viewport().setCursor(Qt.CrossCursor)
+            return
+        item, handle = self._handle_at(pos)
+        if handle and not self.locked:
+            self.viewport().setCursor(_HANDLE_CURSORS[handle])
+        elif self._box_at(pos) is not None and not self.locked:
+            self.viewport().setCursor(Qt.SizeAllCursor)
+        else:
+            self.viewport().setCursor(Qt.ArrowCursor)
+
+    def _update_drag(self, scene_pos):
+        item = self._drag_item
+        delta = scene_pos - self._drag_origin
+        rect = QRectF(self._drag_rect)
+
+        if self._drag_mode == "move":
+            rect.translate(delta)
+            bounds = self.image_rect()
+            # keep a moved box fully inside the image
+            if rect.left() < 0:
+                rect.translate(-rect.left(), 0)
+            if rect.top() < 0:
+                rect.translate(0, -rect.top())
+            if rect.right() > bounds.width():
+                rect.translate(bounds.width() - rect.right(), 0)
+            if rect.bottom() > bounds.height():
+                rect.translate(0, bounds.height() - rect.bottom())
+        else:
+            if "l" in self._drag_mode:
+                rect.setLeft(rect.left() + delta.x())
+            if "r" in self._drag_mode:
+                rect.setRight(rect.right() + delta.x())
+            if "t" in self._drag_mode:
+                rect.setTop(rect.top() + delta.y())
+            if "b" in self._drag_mode:
+                rect.setBottom(rect.bottom() + delta.y())
+            rect = rect.normalized().intersected(self.image_rect())
+
+        item.setRect(rect)
+        self.box_geometry_preview(item)
 
     def mouseReleaseEvent(self, event):
         if self._panning:
@@ -684,6 +722,18 @@ class ImageCanvas(QGraphicsView):
             self.viewport().setCursor(
                 Qt.CrossCursor if self.mode == MODE_DRAW else Qt.ArrowCursor
             )
+            event.accept()
+            return
+
+        if self._drag_item is not None:
+            item, self._drag_item = self._drag_item, None
+            rect = item.rect().normalized().intersected(self.image_rect())
+            if rect.width() < 1 or rect.height() < 1:
+                rect = self._drag_rect        # degenerate drag: undo it
+            item.setRect(rect)
+            item.refresh_z()
+            self._drag_mode = None
+            self.notify_boxes_changed(user_edit=True)
             event.accept()
             return
 
@@ -701,11 +751,23 @@ class ImageCanvas(QGraphicsView):
                 self.add_box(rect, self.active_class)
                 self.status_message.emit(
                     f"Added '{self.class_name(self.active_class)}' box"
+                    + ("" if self.sticky_draw else " — back in select mode (W to draw again)")
                 )
+            if not self.sticky_draw:
+                self.set_mode(MODE_SELECT)
             event.accept()
             return
 
         super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton and self.has_image():
+            box = self._box_at(event.pos())
+            if box is not None:
+                self.prompt_class_change(box)
+                event.accept()
+                return
+        super().mouseDoubleClickEvent(event)
 
     def _start_pan(self, pos):
         self._panning = True
