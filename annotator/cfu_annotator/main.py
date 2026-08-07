@@ -1,4 +1,4 @@
-"""Entry point.  Run with:  python -m app   (from the CFU-classifier folder)"""
+"""Entry point.  Run with:  python -m cfu_annotator   (from the annotator folder)"""
 
 import sys
 
@@ -98,8 +98,43 @@ def _selftest(model_path=None):
             assert back["records"]["a.png"]["annotated"]
         return "save/load ok"
 
+    def canvas_geometry():
+        """Guard the zoom crash: item geometry must not depend on the view.
+
+        A zoom-dependent boundingRect() corrupts QGraphicsScene's spatial index
+        and segfaults on the next wheel event (fixed in 1.1.1).
+        """
+        from PyQt5.QtCore import QRectF
+
+        from .canvas import ImageCanvas
+
+        canvas = ImageCanvas()
+        canvas.set_class_names(["A", "B"])
+        canvas.resize(600, 400)
+        canvas._image_size = (2000, 2000)      # no image file needed
+        canvas._scene.setSceneRect(canvas.image_rect())
+        canvas.set_boxes([
+            {"cls": i % 2, "conf": 0.5,
+             "xyxy": [100 + i * 60, 100 + i * 40, 160 + i * 60, 160 + i * 40]}
+            for i in range(12)
+        ])
+        item = canvas.box_items()[0]
+        shapes = set()
+        for zoom in (0.2, 1.0, 5.0, 25.0):
+            canvas.resetTransform()
+            canvas.scale(zoom, zoom)
+            r = item.boundingRect()
+            shapes.add((r.x(), r.y(), r.width(), r.height()))
+        canvas.shutdown()
+        if len(shapes) != 1:
+            raise AssertionError(
+                f"boundingRect() varies with zoom: {sorted(shapes)}"
+            )
+        return "zoom-independent"
+
     step("Qt available", make_app)
     step("UI builds", build_window)
+    step("canvas geometry", canvas_geometry)
     step("torch imports", import_torch)
     step("ultralytics imports", import_ultralytics)
     step("status icons render", draw_icons)

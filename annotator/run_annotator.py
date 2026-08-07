@@ -1,12 +1,13 @@
-"""Entry point for the bundled app (and for `python cfu_annotator.py`).
+"""Entry point for the bundled app (and for `python run_annotator.py`).
 
-PyInstaller needs a plain script to start from; everything else lives in `app/`.
+PyInstaller needs a plain script to start from; everything else lives in the
+`cfu_annotator/` package next to this file.
 """
 
 import multiprocessing
 import sys
 
-from app.main import main
+from cfu_annotator.main import main
 
 if __name__ == "__main__":
     # Required in a frozen build: torch's DataLoader and anything else that

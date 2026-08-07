@@ -24,7 +24,7 @@ runs/detect/*/weights/best.pt   trained YOLO weights (one folder per attempt)
         │
         ├──▶ notebooks/inference.ipynb   batch inference + review tooling
         ├──▶ notebooks/app.ipynb         interactive Gradio demo
-        ├──▶ app/                        desktop counting/annotation app
+        ├──▶ annotator/                  desktop counting/annotation app
         └──▶ nuc/                        CVAT auto-annotation service (Nuclio)
 ```
 
@@ -41,8 +41,10 @@ runs/detect/*/weights/best.pt   trained YOLO weights (one folder per attempt)
 | `logs/` | stdout/stderr from each `train.bsub` submission. |
 | `runs/detect/` | Training outputs — one folder per attempt (`1600px_training`, `3200px_training`, `_v2`, `_v3`), each containing `cfu_detector/weights/best.pt` plus Ultralytics' training metrics/plots. The `_v2`/`_v3` progression reflects iterating on tile size and dataset quality across training runs. |
 | `notebooks/` | Data prep, QC, and inference notebooks — see below. |
-| `app/` | Standalone desktop app (PyQt5) for counting CFUs: point it at a folder of plate photos and a `.pt` model, auto-annotate, correct the boxes by hand, save the session as a project, export counts as CSV and/or YOLO labels. Has its own [README](app/README.md). |
-| `build_app.py`, `CFU_Annotator.spec`, `cfu_annotator.py` | Bundle the app into a double-clickable `CFU Annotator.app` (no Python needed on the machine that runs it) with PyInstaller, then verify the bundle via its own self-test. `dist/` is gitignored. |
+| `annotator/` | Everything for the standalone desktop app (PyQt5) that counts CFUs: point it at a folder of plate photos and a `.pt` model, auto-annotate, correct the boxes by hand, save the session as a project, export counts as CSV and/or YOLO labels. Start it by double-clicking `annotator/dist/CFU Annotator.app`. Has its own [README](annotator/README.md). |
+| ↳ `annotator/cfu_annotator/` | The app's Python package. Run in place with `python -m cfu_annotator` from `annotator/`. |
+| ↳ `annotator/build_app.py`, `CFU_Annotator.spec`, `run_annotator.py` | Bundle the app into a double-clickable `CFU Annotator.app` (no Python needed on the machine that runs it) with PyInstaller, then verify the bundle via its own self-test. |
+| ↳ `annotator/tests/`, `annotator/docs/`, `annotator/dist/` | Regression tests, screenshots, and build output (`dist/` and `build_pyinstaller/` are gitignored). |
 | `nuc/` | Deploys `best.pt` as a Nuclio serverless function so CVAT can auto-annotate new plates. Has its own [README](nuc/README.md) with deployment details. |
 | `requirements.txt`, `.venv/` | Python environment (ultralytics, sahi, ensemble-boxes, gradio, labelImg, torch, etc). |
 

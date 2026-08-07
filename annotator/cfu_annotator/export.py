@@ -8,33 +8,50 @@ from .status import status_of
 
 CSV_NAME = "CFU_counts.csv"
 YOLO_DIRNAME = "yolo_labels"
+IMAGES_DIRNAME = "annotated_images"
 INFO_NAME = "export_info.txt"
 
-
-def csv_path(output_folder):
-    return Path(output_folder) / CSV_NAME
+EXPORT_PREFIX = "CFU_export"
 
 
-def yolo_dir(output_folder):
-    return Path(output_folder) / YOLO_DIRNAME
+def export_dir_name(when=None):
+    """Timestamped folder name, e.g. CFU_export_2026-07-27_1642."""
+    when = when or datetime.now()
+    return f"{EXPORT_PREFIX}_{when.strftime('%Y-%m-%d_%H%M')}"
 
 
-def info_path(output_folder):
-    return Path(output_folder) / INFO_NAME
+def make_export_dir(output_folder, when=None):
+    """Create a fresh, uniquely named folder for one export.
+
+    Every export gets its own folder, so a re-run never quietly overwrites the
+    numbers someone already pasted into a figure. If two exports land in the
+    same minute the second gets a -2 suffix rather than clobbering the first.
+    """
+    parent = Path(output_folder)
+    base = export_dir_name(when)
+    target = parent / base
+    attempt = 2
+    while target.exists():
+        target = parent / f"{base}-{attempt}"
+        attempt += 1
+    target.mkdir(parents=True)
+    return target
 
 
-def existing_targets(output_folder, want_csv, want_yolo):
-    """Which export targets already exist on disk (so the UI can confirm)."""
-    found = []
-    if want_csv and csv_path(output_folder).exists():
-        found.append(csv_path(output_folder))
-    if want_yolo:
-        d = yolo_dir(output_folder)
-        if d.exists() and any(d.glob("*.txt")):
-            found.append(d)
-    if info_path(output_folder).exists():
-        found.append(info_path(output_folder))
-    return found
+def csv_path(export_folder):
+    return Path(export_folder) / CSV_NAME
+
+
+def yolo_dir(export_folder):
+    return Path(export_folder) / YOLO_DIRNAME
+
+
+def images_dir(export_folder):
+    return Path(export_folder) / IMAGES_DIRNAME
+
+
+def info_path(export_folder):
+    return Path(export_folder) / INFO_NAME
 
 
 def write_csv(output_folder, image_names, class_names, records):
@@ -168,7 +185,7 @@ def write_run_info(output_folder, *, app_version, project_path, image_folder,
 
     lines += ["", "FILES WRITTEN", "-" * 60]
     lines += [f"  {item}" for item in outputs_written] or ["  (none)"]
-    lines += ["", f"  {INFO_NAME}  (this file)", ""]
+    lines += [f"  {INFO_NAME}  (this file)", ""]
 
     target.write_text("\n".join(lines), encoding="utf-8")
     return target

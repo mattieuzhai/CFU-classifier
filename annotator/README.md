@@ -6,7 +6,7 @@ finds, lets you correct those boxes by hand, and exports the counts.
 
 No programming needed — everything is buttons and menus.
 
-![](../docs/cfu_annotator.png)
+![](docs/cfu_annotator.png)
 
 Work is saved as a **project** you can reopen later, and every image carries a
 status — annotated, edited by hand, or finalized — shown in the image list.
@@ -35,13 +35,13 @@ application: no Terminal, no Python installation, no scripts. Drag it to
 
 Two other ways to start it, both needing the project's Python environment:
 
-- Double-click `Launch CFU Annotator.command` in the `CFU-classifier` folder. A
+- Double-click `Launch CFU Annotator.command` in the `annotator` folder. A
   Terminal window opens, checks the required packages (offering to install
   anything missing), and starts the app. Leave that window open while you work.
 - From a terminal:
 
 ```bash
-cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier" && .venv/bin/python -m app
+cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier/annotator" && ../.venv/bin/python -m cfu_annotator
 ```
 
 ---
@@ -110,7 +110,31 @@ Click **Choose output folder…**, then tick what you want written:
 |---|---|---|
 | **Count summary** | `CFU_counts.csv` | on |
 | **YOLO labels** | `yolo_labels/` | off |
+| **Annotated images** | `annotated_images/` | on |
 | *(always)* | `export_info.txt` | — |
+
+Nothing is written loose into the folder you chose. Each export creates its own
+dated folder inside it:
+
+```
+counts_out/                          ← the folder you chose
+├── CFU_export_2026-08-07_1642/      ← one export
+│   ├── CFU_counts.csv
+│   ├── export_info.txt
+│   ├── yolo_labels/
+│   └── annotated_images/
+└── CFU_export_2026-08-07_1710/      ← a later export, untouched by the first
+```
+
+Re-exporting therefore never overwrites numbers you have already used, and two
+exports in the same minute get a `-2` suffix rather than colliding.
+
+**Annotated images** are full-resolution copies of each annotated plate with the
+boxes and labels drawn on (`plate1.jpg` → `plate1_annotated.jpg`), for checking
+counts without opening the app. They're the slowest and bulkiest part of an
+export — a 10400 × 10752 plate takes about a second and lands at roughly 25 MB,
+so a 40-plate experiment adds around a gigabyte. It runs with a progress bar and
+a working Cancel; untick the box to skip it.
 
 `CFU_counts.csv` has one row per image and one column per class:
 
@@ -135,7 +159,7 @@ CFU Annotator — export record
 ============================================================
 
 Exported          : 2026-07-27 15:41:08
-App version       : 1.1.0
+App version       : 1.1.1
 Project file      : /Users/you/Desktop/CFU counts/March 2026.cfuproj
 
 MODEL
@@ -203,7 +227,8 @@ labelImg/CVAT:
 | Select a box | Click it |
 | Move a box | Drag its middle |
 | Resize a box | Drag one of the eight white handles |
-| Draw a new box | Press `W`, then drag on the image. `Esc` goes back |
+| Draw a new box | Press `W`, then drag on the image |
+| Draw several in a row | Tick **Keep drawing** in the toolbar first |
 | Change a box's class | Select it, press its number key (`1`–`4`), or double-click it for a menu |
 | Delete a box | Select it, press `Delete` |
 | Zoom | Scroll wheel (zooms where the pointer is), or `+` / `−` |
@@ -212,6 +237,11 @@ labelImg/CVAT:
 | Next / previous image | `D` / `A`, the buttons under the image, or click a row in the image list |
 | Jump to any image | Click its row in the image list |
 | Mark an image complete | **Mark as finalized**, or ⌘L |
+
+After you draw a box the tool returns to **Select / Edit** on its own, so the
+next click edits rather than drawing another box by accident. If you're adding
+several colonies in a row, tick **Keep drawing** in the toolbar and the tool
+stays put until you press `Esc`.
 
 Boxes you draw or edit are indistinguishable from the model's own in the export,
 and edits stick when you move between images. The class highlighted in the
@@ -252,6 +282,20 @@ progress; exporting writes the spreadsheet. Do both.
 
 ---
 
+## Remembering your setup
+
+**Remember settings for next time** (bottom of the left panel, or the Project
+menu) is on by default. With it ticked, the app reopens with the same image
+folder, model, output folder, detection settings, export choices and view
+toggles you last used — so a repeat session starts with one click instead of
+five.
+
+It remembers *settings*, never annotations: the images come back listed as not
+annotated. Your boxes live in a project file, which you save deliberately.
+Untick the box to stop remembering and clear anything already stored.
+
+---
+
 ## Notes
 
 - Nothing is ever written to your image folder — the app only reads from it.
@@ -262,32 +306,76 @@ progress; exporting writes the spreadsheet. Do both.
 
 ## Building the standalone app
 
-The double-clickable app is built with PyInstaller, which packages Python, Qt,
-torch and ultralytics into one bundle so the machine running it needs nothing
-installed:
+`CFU Annotator.app` is produced by PyInstaller, which packages Python, Qt, torch
+and ultralytics into one self-contained bundle — the machine that runs it needs
+nothing installed. You only need to rebuild after changing the code in `cfu_annotator/`.
+
+### Step 1 — install PyInstaller (once)
+
+It is already installed in this project's `.venv`. Check with:
 
 ```bash
-cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier" && .venv/bin/python build_app.py
+cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier/annotator" && ../.venv/bin/python -m PyInstaller --version
 ```
 
-It takes a few minutes and produces `dist/CFU Annotator.app` (~1.5 GB — torch is
-most of that). The build then runs the app's own self-test, so a bundle that
-can't load the model fails the build instead of failing in someone's hands. To
-re-check an existing build without rebuilding:
+That should print a version number such as `6.21.0`. A `WARNING: Assuming this
+is not an Anaconda environment…` line above it is harmless — this `.venv` is
+built on Anaconda's Python and PyInstaller always says so.
+
+If the command errors instead, install it:
 
 ```bash
-cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier" && .venv/bin/python build_app.py --verify-only
+cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier/annotator" && ../.venv/bin/python -m pip install pyinstaller
 ```
 
-Distributing it: zip the `.app` and share it however you like (it's too big for
-email — use a shared drive). Because it isn't signed with an Apple developer
-certificate, whoever receives it needs the right-click → **Open** step, or the
-`xattr -dr com.apple.quarantine` command shown at the top of this file. Signing
-and notarising with a paid Apple Developer account would remove that step.
+### Step 2 — build
 
-**Windows.** PyInstaller can only build for the platform it runs on, so a
-`.exe` cannot be produced on this Mac. The same recipe works on Windows — copy
-this folder to a Windows machine with Python 3.12, then:
+```bash
+cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier/annotator" && ../.venv/bin/python build_app.py
+```
+
+Takes about 2–3 minutes. Any previous build is removed first, so this is also
+how you rebuild after editing the code. Output:
+
+```
+dist/CFU Annotator.app        the app (~1.5 GB; torch is most of it)
+build_pyinstaller/            scratch files, safe to delete
+```
+
+Both are gitignored — never commit them.
+
+### Step 3 — the build checks itself
+
+When the build finishes it launches the bundle's own self-test, which confirms
+that inside the bundle Qt starts, the window builds, torch and ultralytics
+import, and a real `.pt` model loads and runs a detection. You should see:
+
+```
+SELF-TEST: OK
+The bundled app passed its self-test.
+```
+
+If it says `FAILED`, the bundle is broken and must not be distributed — the
+named step tells you what's missing. To re-check a build without rebuilding:
+
+```bash
+cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier/annotator" && ../.venv/bin/python build_app.py --verify-only
+```
+
+### Step 4 — try it, then share it
+
+Double-click `dist/CFU Annotator.app`. To hand it to someone else, zip it and
+put it on a shared drive (it's far too big to email). Because it isn't signed
+with an Apple developer certificate, whoever receives it needs the right-click →
+**Open** step, or the `xattr -dr com.apple.quarantine` command shown at the top
+of this file. Signing and notarising with a paid Apple Developer account would
+remove that step.
+
+### Building a Windows .exe
+
+PyInstaller can only build for the platform it runs on, so a `.exe` **cannot** be
+produced on this Mac. The same recipe works on Windows — copy this folder to a
+Windows machine with Python 3.12 installed, then:
 
 ```bash
 py -m pip install -r requirements.txt pyinstaller && py build_app.py
@@ -296,21 +384,62 @@ py -m pip install -r requirements.txt pyinstaller && py build_app.py
 That produces `dist\CFU Annotator\CFU Annotator.exe`. Nothing in the app is
 macOS-specific, but the Windows build has not been tested here.
 
-The build is driven by `CFU_Annotator.spec`. Two things in it matter if you
-change it: ultralytics' package data must be collected (it loads yaml configs at
-runtime), and `excludes` must never list a *submodule* of torch — torch imports
-those itself, and a partial import corrupts its C extensions.
+### If you edit the build recipe
+
+The build is driven by `CFU_Annotator.spec`. Two things in it matter:
+
+- ultralytics' package data must be collected (`collect_all`) — it loads yaml
+  model configs at runtime, so modules alone aren't enough.
+- `excludes` must never list a *submodule* of torch (e.g. `torch.testing`).
+  torch imports those itself, and the partial import leaves its C extensions
+  half-registered. The bundle then builds cleanly and dies on launch with
+  `cannot initialize type "RpcBackendOptions"`. Only exclude whole packages.
 
 ## For developers
 
 | File | Purpose |
 |---|---|
-| `main.py` | Entry point (`python -m app`), dependency check, `--selftest` |
+| `main.py` | Entry point (`python -m cfu_annotator`), dependency check, `--selftest` |
 | `mainwindow.py` | Window layout, pickers, wiring, export flow |
 | `canvas.py` | `ImageCanvas` / `BoxItem` — display and interactive editing |
 | `detector.py` | Model loading + validation, tiled inference, NMS merge |
 | `project.py` | `.cfuproj` save/load |
 | `status.py` | The four per-image statuses and their drawn icons |
+| `render.py` | Drawing boxes onto exported image copies |
+| `settings.py` | Remembering the last-used setup (QSettings) |
+| `../tests/test_canvas_geometry.py` | Regression tests for the canvas geometry contract (in `annotator/tests/`) |
+
+Run every check with:
+
+```bash
+cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier/annotator" && ../.venv/bin/python tests/run_all.py
+```
+
+`tests/test_core.py` covers scanning, model validation, the export files and
+projects; `tests/test_ui.py` drives the window with real mouse events;
+`tests/test_canvas_geometry.py` guards the crash described below.
+
+### One rule to keep in mind when editing `canvas.py`
+
+`BoxItem.boundingRect()` and `BoxItem.shape()` must depend **only** on the box's
+own rect — never on the view or its zoom level. QGraphicsScene caches those rects
+in its spatial index, and `QGraphicsView::scale()` dispatches a synthetic
+mouse-move *while* the transform is being applied, so an item whose bounds have
+silently changed gets looked up in a stale index and the process segfaults inside
+`QGraphicsScene::mouseMoveEvent`. That was the 1.1.0 wheel-zoom crash.
+
+Anything that must stay a constant size on screen — the selection handles, the
+class labels, the FINALIZED badge — is drawn by the view in `drawForeground()` in
+device coordinates, and hit-tested there. Keep it that way.
+
+## Version history
+
+| Version | Change |
+|---|---|
+| 1.2.0 | Exports go into their own dated folder; annotated images can be exported; the draw tool returns to Select after each box; settings are remembered between launches |
+| 1.1.1 | Fixed a crash when zooming with the scroll wheel on an annotated image |
+| 1.1.0 | Projects, image list with per-image status, export log, bundled `.app` |
+| 1.0.0 | First version |
 | `workers.py` | `QThread`s for model loading and inference |
 | `scan.py` | Folder scanning and image-format triage |
 | `export.py` | CSV summary and YOLO label writing |

@@ -7,9 +7,18 @@
 # CFU Annotator.exe — PyInstaller can only build for the OS it runs on, so a
 # Windows executable has to be built on a Windows machine.
 
+import re
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_all
 
 APP_NAME = "CFU Annotator"
+
+# Single source of truth, so the bundle's version can't drift from the app's.
+VERSION = re.search(
+    r'__version__ = "([^"]+)"',
+    Path(SPECPATH, "cfu_annotator", "__init__.py").read_text(),
+).group(1)
 
 datas, binaries, hiddenimports = [], [], []
 
@@ -39,8 +48,8 @@ EXCLUDES = [
 ]
 
 a = Analysis(
-    ["cfu_annotator.py"],
-    pathex=["."],
+    [str(Path(SPECPATH, "run_annotator.py"))],
+    pathex=[SPECPATH],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
@@ -90,8 +99,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": APP_NAME,
         "CFBundleDisplayName": APP_NAME,
-        "CFBundleShortVersionString": "1.1.0",
-        "CFBundleVersion": "1.1.0",
+        "CFBundleShortVersionString": VERSION,
+        "CFBundleVersion": VERSION,
         "NSHighResolutionCapable": True,
         # Opening a .cfuproj from Finder should start the app.
         "CFBundleDocumentTypes": [

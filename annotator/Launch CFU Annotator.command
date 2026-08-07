@@ -15,7 +15,8 @@ echo
 
 # --- 1. Find a Python interpreter -------------------------------------------
 PY=""
-for candidate in "$HERE/.venv/bin/python" "$HERE/.venv/bin/python3" "$(command -v python3 || true)"; do
+# The project's virtual environment lives one level up, at the repo root.
+for candidate in "$HERE/../.venv/bin/python" "$HERE/../.venv/bin/python3" "$(command -v python3 || true)"; do
     if [ -n "$candidate" ] && [ -x "$candidate" ]; then
         PY="$candidate"
         break
@@ -85,7 +86,7 @@ fi
 # --- 3. Launch ---------------------------------------------------------------
 echo "Starting the app — this window can be minimised, but leave it open."
 echo
-"$PY" -m app
+"$PY" -m cfu_annotator
 STATUS=$?
 
 echo
