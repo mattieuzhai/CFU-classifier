@@ -1,0 +1,496 @@
+Process Process-12:
+Process Process-2:
+Process Process-7:
+Process Process-2:
+Process Process-6:
+Process Process-9:
+Process Process-8:
+Process Process-3:
+Process Process-14:
+Process Process-3:
+Process Process-7:
+Traceback (most recent call last):
+Process Process-1:
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 1264, in wait
+Process Process-1:
+Process Process-17:
+    return self._wait(timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 2053, in _wait
+    (pid, sts) = self._try_wait(0)
+                 ^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 2011, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/research/rgs01/home/clusterHome/mzhai72/CFU_classifier/train_aug.py", line 22, in <module>
+Process Process-18:
+    model.train(resume=True)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/model.py", line 788, in train
+    self.trainer.train()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 238, in train
+    subprocess.run(cmd, check=True)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 550, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 1201, in communicate
+    self.wait()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 1277, in wait
+    self._wait(timeout=sigint_timeout)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 2047, in _wait
+    time.sleep(delay)
+KeyboardInterrupt
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 337, in _exit_function
+    _run_finalizers(0)
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 303, in _run_finalizers
+    finalizer()
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 208, in __call__
+    def __call__(self, wr=None,
+    
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+KeyboardInterrupt
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+KeyboardInterrupt
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+KeyboardInterrupt
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+KeyboardInterrupt
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 317, in _bootstrap
+    util._exit_function()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+KeyboardInterrupt
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+KeyboardInterrupt
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+KeyboardInterrupt
+KeyboardInterrupt
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 323, in _exit_function
+    def _exit_function(info=info, debug=debug, _run_finalizers=_run_finalizers,
+    
+KeyboardInterrupt
+KeyboardInterrupt
+KeyboardInterrupt
+KeyboardInterrupt
+KeyboardInterrupt
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 335, in is_set
+    with self._cond:
+         ^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 236, in __enter__
+    def __enter__(self):
+    
+KeyboardInterrupt
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/mzhai72/.config/Ultralytics/DDP/_temp_dtqj81ln23452807064432.py", line 19, in <module>
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 246, in train
+[rank1]:     self._do_train()
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 439, in _do_train
+[rank1]:     loss, self.loss_items = self.model(batch)
+[rank1]:                             ^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1699, in forward
+[rank1]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank1]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1524, in _run_ddp_forward
+[rank1]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 141, in forward
+[rank1]:     return self.loss(x, *args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 335, in loss
+[rank1]:     return self.criterion(preds, batch)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/loss.py", line 1178, in __call__
+[rank1]:     loss_one2one = self.one2one.loss(one2one, batch)
+[rank1]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/loss.py", line 476, in loss
+[rank1]:     loss, loss_detach = self.get_assigned_targets_and_loss(preds, batch)[1:]
+[rank1]:                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/loss.py", line 419, in get_assigned_targets_and_loss
+[rank1]:     _, target_bboxes, target_scores, fg_mask, target_gt_idx = self.assigner(
+[rank1]:                                                               ^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+[rank1]:     return func(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/tal.py", line 98, in forward
+[rank1]:     return self._forward(pd_scores, pd_bboxes, anc_points, gt_labels, gt_bboxes, mask_gt)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/tal.py", line 126, in _forward
+[rank1]:     mask_pos, align_metric, overlaps = self.get_pos_mask(
+[rank1]:                                        ^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/tal.py", line 164, in get_pos_mask
+[rank1]:     align_metric, overlaps = self.get_box_metrics(pd_scores, pd_bboxes, gt_labels, gt_bboxes, mask_in_gts * mask_gt)
+[rank1]:                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/tal.py", line 198, in get_box_metrics
+[rank1]:     pd_boxes = pd_bboxes.unsqueeze(1).expand(-1, self.n_max_boxes, -1, -1)[mask_gt]
+[rank1]:                ^^^^^^^^^^^^^^^^^^^^^^
+[rank1]: KeyboardInterrupt
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 439, in _do_train
+[rank0]:     loss, self.loss_items = self.model(batch)
+[rank0]:                             ^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1699, in forward
+[rank0]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank0]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1524, in _run_ddp_forward
+[rank0]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 141, in forward
+[rank0]:     return self.loss(x, *args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 335, in loss
+[rank0]:     return self.criterion(preds, batch)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/loss.py", line 1178, in __call__
+[rank0]:     loss_one2one = self.one2one.loss(one2one, batch)
+[rank0]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/loss.py", line 476, in loss
+[rank0]:     loss, loss_detach = self.get_assigned_targets_and_loss(preds, batch)[1:]
+[rank0]:                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/loss.py", line 417, in get_assigned_targets_and_loss
+[rank0]:     pred_bboxes = self.bbox_decode(anchor_points, pred_distri)  # xyxy, (b, h*w, 4)
+[rank0]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/loss.py", line 393, in bbox_decode
+[rank0]:     return dist2bbox(pred_dist, anchor_points, xywh=False)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/utils/tal.py", line 418, in dist2bbox
+[rank0]:     lt, rb = distance.chunk(2, dim)
+[rank0]:              ^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: KeyboardInterrupt
+
+[rank0]: During handling of the above exception, another exception occurred:
+
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/mzhai72/.config/Ultralytics/DDP/_temp_dtqj81ln23452807064432.py", line 19, in <module>
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 246, in train
+[rank0]:     self._do_train()
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 432, in _do_train
+[rank0]:     with autocast(self.amp):
+[rank0]:          ^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/amp/autocast_mode.py", line 355, in __exit__
+[rank0]:     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):  # type: ignore[override]
+
+[rank0]: KeyboardInterrupt
+Process Process-6:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 335, in is_set
+    with self._cond:
+         ^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 237, in __enter__
+    return self._lock.__enter__()
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+Process Process-16:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 334, in is_set
+    def is_set(self):
+    
+KeyboardInterrupt
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/weakref.py", line 666, in _exitfunc
+[rank1]:     f()
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/weakref.py", line 590, in __call__
+[rank1]:     return info.func(*info.args, **(info.kwargs or {}))
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/library.py", line 479, in _del_library
+[rank1]:     m.reset()
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/signal_handling.py", line 73, in handler
+[rank1]:     _error_if_any_worker_fails()
+[rank1]: RuntimeError: DataLoader worker (pid 38286) exited unexpectedly with exit code 1. Details are lost due to multiprocessing. Rerunning with num_workers=0 may give better error trace.
+Process Process-14:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 334, in is_set
+    def is_set(self):
+    
+KeyboardInterrupt
+Process Process-17:
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 303, in _run_finalizers
+    finalizer()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 221, in __call__
+    if self._pid != getpid():
+                    ^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/signal_handling.py", line 70, in handler
+    def handler(signum, frame) -> None:
+    
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/signal_handling.py", line 73, in handler
+    _error_if_any_worker_fails()
+RuntimeError: DataLoader worker (pid 38319) exited unexpectedly with exit code 1. Details are lost due to multiprocessing. Rerunning with num_workers=0 may give better error trace.
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 334, in is_set
+    def is_set(self):
+    
+KeyboardInterrupt
+Process Process-12:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 334, in is_set
+    def is_set(self):
+    
+KeyboardInterrupt
+Process Process-11:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 335, in is_set
+    with self._cond:
+         ^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 240, in __exit__
+    return self._lock.__exit__(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 98, in __exit__
+    return self._semlock.__exit__(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+Process Process-13:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 380, in _worker_loop
+    pass
+KeyboardInterrupt
+Process Process-10:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 335, in is_set
+    with self._cond:
+         ^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 237, in __enter__
+    return self._lock.__enter__()
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+Process Process-16:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 336, in is_set
+    if self._flag.acquire(False):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+Process Process-15:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 334, in is_set
+    def is_set(self):
+    
+KeyboardInterrupt
+Process Process-8:
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/worker.py", line 381, in _worker_loop
+    if done_event.is_set():
+       ^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 335, in is_set
+    with self._cond:
+         ^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 240, in __exit__
+    return self._lock.__exit__(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/synchronize.py", line 98, in __exit__
+    return self._semlock.__exit__(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/weakref.py", line 666, in _exitfunc
+[rank0]:     f()
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/weakref.py", line 590, in __call__
+[rank0]:     return info.func(*info.args, **(info.kwargs or {}))
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/library.py", line 479, in _del_library
+[rank0]:     m.reset()
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/signal_handling.py", line 73, in handler
+[rank0]:     _error_if_any_worker_fails()
+[rank0]: RuntimeError: DataLoader worker (pid 38284) exited unexpectedly with exit code 1. Details are lost due to multiprocessing. Rerunning with num_workers=0 may give better error trace.
+Exception ignored in atexit callback: <function _exit_function at 0x15548c5939c0>
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/util.py", line 358, in _exit_function
+    for p in active_children():
+             ^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 47, in active_children
+    _cleanup()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/process.py", line 64, in _cleanup
+    if (child_popen := p._popen) and child_popen.poll() is not None:
+                                     ^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/popen_fork.py", line 27, in poll
+    pid, sts = os.waitpid(self.pid, flag)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/signal_handling.py", line 73, in handler
+    _error_if_any_worker_fails()
+RuntimeError: DataLoader worker (pid 38325) exited unexpectedly with exit code 1. Details are lost due to multiprocessing. Rerunning with num_workers=0 may give better error trace.

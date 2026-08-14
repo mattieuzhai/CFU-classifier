@@ -12,26 +12,34 @@ from ultralytics import YOLO
 #     0 -> 180                       vertical flip + full rotation are free,
 #                                   domain-valid variety.
 # Writes to its own project folder so it never overwrites the baseline v4 run.
+project_name = "3200px_aug_training"
+checkpoint = Path(__file__).parent / "runs" / "detect" / project_name / "cfu_detector" / "weights" / "last.pt"
 
-model = YOLO("yolo26m.pt")  # nano detection model
+if checkpoint.exists():
+    # Continue an interrupted run (e.g. killed by a queue wall-time limit) —
+    # Ultralytics reloads epoch/optimizer state and the original train args.
+    model = YOLO(str(checkpoint))
+    model.train(resume=True)
+else:
+    model = YOLO("yolo26m.pt")
 
-model.train(
-    data=str(Path(__file__).parent / "data.yaml"),  # same tiled dataset as baseline
-    epochs=100,
-    imgsz=3200,
-    batch=16,
-    device=[0, 1],   # 2 GPUs (matches train.bsub num=2)
+    model.train(
+        data=str(Path(__file__).parent / "data.yaml"),  # same tiled dataset as baseline
+        epochs=60,
+        imgsz=3200,
+        batch=12,
+        device=[0,1],   # 2 GPUs (matches train.bsub num=6)
 
-    # --- augmentation overrides (the experiment) ---
-    hsv_h=0.015,        # keep hue shift tiny — never turn red into green
-    hsv_s=0.35,         # was 0.7 — ease off, colony class is color-dependent
-    hsv_v=0.4,          # brightness jitter, fine (mimics lighting)
-    auto_augment=None,  # was 'randaugment' — drop extra color ops
-    flipud=0.5,         # plate has no up/down — free variety
-    fliplr=0.5,
-    degrees=180.0,      # round plate is rotation-invariant — free variety
+        # --- augmentation overrides (the experiment) ---
+        hsv_h=0.015,        # keep hue shift tiny — never turn red into green
+        hsv_s=0.35,         # was 0.7 — ease off, colony class is color-dependent
+        hsv_v=0.4,          # brightness jitter, fine (mimics lighting)
+        auto_augment=None,  # was 'randaugment' — drop extra color ops
+        flipud=0.5,         # plate has no up/down — free variety
+        fliplr=0.5,
+        degrees=180.0,      # round plate is rotation-invariant — free variety
 
-    project="3200px_aug_training",
-    name="cfu_detector",
-    exist_ok=True,
-)
+        project=project_name,
+        name="cfu_detector",
+        exist_ok=True,
+    )

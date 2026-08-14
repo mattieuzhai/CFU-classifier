@@ -1,0 +1,233 @@
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/mzhai72/.config/Ultralytics/DDP/_temp_3nsmmhyf23452614720880.py", line 19, in <module>
+[rank1]:     results = trainer.train()
+[rank1]:               ^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 246, in train
+[rank1]:     self._do_train()
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 439, in _do_train
+[rank1]:     loss, self.loss_items = self.model(batch)
+[rank1]:                             ^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1699, in forward
+[rank1]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank1]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1524, in _run_ddp_forward
+[rank1]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 141, in forward
+[rank1]:     return self.loss(x, *args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 334, in loss
+[rank1]:     preds = self.forward(batch["img"])
+[rank1]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 142, in forward
+[rank1]:     return self.predict(x, *args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 159, in predict
+[rank1]:     return self._predict_once(x, profile, visualize, embed)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 181, in _predict_once
+[rank1]:     x = m(x)  # run
+[rank1]:         ^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/upsampling.py", line 174, in forward
+[rank1]:     return F.interpolate(
+[rank1]:            ^^^^^^^^^^^^^^
+[rank1]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/functional.py", line 4817, in interpolate
+[rank1]:     return torch._C._nn.upsample_nearest2d(input, output_size, scale_factors)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.44 GiB. GPU 1 has a total capacity of 79.25 GiB of which 1.94 GiB is free. Including non-PyTorch memory, this process has 77.27 GiB memory in use. Of the allocated memory 75.12 GiB is allocated by PyTorch, and 1.03 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)
+Exception in thread Thread-2 (_pin_memory_loop):
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 52, in _pin_memory_loop
+    do_one_step()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 28, in do_one_step
+    r = in_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/queues.py", line 122, in get
+    return _ForkingPickler.loads(res)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/multiprocessing/reductions.py", line 540, in rebuild_storage_fd
+    fd = df.detach()
+         ^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 57, in detach
+    with _resource_sharer.get_connection(self._id) as conn:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 86, in get_connection
+    c = Client(address, authkey=process.current_process().authkey)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 525, in Client
+    answer_challenge(c, authkey)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 953, in answer_challenge
+    message = connection.recv_bytes(256)         # reject large message
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 216, in recv_bytes
+    buf = self._recv_bytes(maxlength)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 430, in _recv_bytes
+    buf = self._recv(4)
+          [rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/mzhai72/.config/Ultralytics/DDP/_temp_3nsmmhyf23452614720880.py", line 19, in <module>
+[rank0]:     results = trainer.train()
+[rank0]:               ^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 246, in train
+[rank0]:     self._do_train()
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 439, in _do_train
+[rank0]:     loss, self.loss_items = self.model(batch)
+[rank0]:                             ^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1699, in forward
+[rank0]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank0]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/parallel/distributed.py", line 1524, in _run_ddp_forward
+[rank0]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 141, in forward
+[rank0]:     return self.loss(x, *args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 334, in loss
+[rank0]:     preds = self.forward(batch["img"])
+[rank0]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 142, in forward
+[rank0]:     return self.predict(x, *args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 159, in predict
+[rank0]:     return self._predict_once(x, profile, visualize, embed)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/nn/tasks.py", line 181, in _predict_once
+[rank0]:     x = m(x)  # run
+[rank0]:         ^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/modules/upsampling.py", line 174, in forward
+[rank0]:     return F.interpolate(
+[rank0]:            ^^^^^^^^^^^^^^
+[rank0]:   File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/nn/functional.py", line 4817, in interpolate
+[rank0]:     return torch._C._nn.upsample_nearest2d(input, output_size, scale_factors)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.44 GiB. GPU 0 has a total capacity of 79.25 GiB of which 1.90 GiB is free. Including non-PyTorch memory, this process has 77.30 GiB memory in use. Of the allocated memory 75.12 GiB is allocated by PyTorch, and 1.06 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)
+Exception in thread Thread-3 (_pin_memory_loop):
+Traceback (most recent call last):
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 52, in _pin_memory_loop
+    do_one_step()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/utils/data/_utils/pin_memory.py", line 28, in do_one_step
+    r = in_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/queues.py", line 122, in get
+    return _ForkingPickler.loads(res)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/multiprocessing/reductions.py", line 540, in rebuild_storage_fd
+    fd = df.detach()
+         ^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 57, in detach
+    with _resource_sharer.get_connection(self._id) as conn:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/resource_sharer.py", line 86, in get_connection
+    c = Client(address, authkey=process.current_process().authkey)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 525, in Client
+    answer_challenge(c, authkey)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 953, in answer_challenge
+    message = connection.recv_bytes(256)         # reject large message
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 216, in recv_bytes
+    buf = self._recv_bytes(maxlength)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 430, in _recv_bytes
+    buf = self._recv(4)
+          ^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/multiprocessing/connection.py", line 399, in _recv
+    raise EOFError
+EOFError
+W0814 14:05:11.479000 7480 /research/rgs01/home/clusterHome/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/api.py:1012] Sending process 7486 closing signal SIGTERM
+E0814 14:05:16.050000 7480 /research/rgs01/home/clusterHome/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/api.py:986] failed (exitcode: 1) local_rank: 1 (pid: 7487) of binary: /home/mzhai72/.conda/envs/cfu-env/bin/python
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/run.py", line 994, in <module>
+    main()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 362, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/run.py", line 990, in main
+    run(args)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/run.py", line 981, in run
+    elastic_launch(
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 170, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 317, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+/home/mzhai72/.config/Ultralytics/DDP/_temp_3nsmmhyf23452614720880.py FAILED
+------------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-08-14_14:05:16
+  host      : nodegpu215.cm.cluster
+  rank      : 0 (local_rank: 0)
+  exitcode  : 1 (pid: 7486)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-08-14_14:05:11
+  host      : nodegpu215.cm.cluster
+  rank      : 1 (local_rank: 1)
+  exitcode  : 1 (pid: 7487)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
+Traceback (most recent call last):
+  File "/research/rgs01/home/clusterHome/mzhai72/CFU_classifier/train_aug.py", line 18, in <module>
+    model.train(
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/model.py", line 788, in train
+    self.trainer.train()
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 240, in train
+    raise e
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/site-packages/ultralytics/engine/trainer.py", line 238, in train
+    subprocess.run(cmd, check=True)
+  File "/home/mzhai72/.conda/envs/cfu-env/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/home/mzhai72/.conda/envs/cfu-env/bin/python', '-m', 'torch.distributed.run', '--nproc_per_node', '2', '--master_port', '34627', '/home/mzhai72/.config/Ultralytics/DDP/_temp_3nsmmhyf23452614720880.py']' returned non-zero exit status 1.

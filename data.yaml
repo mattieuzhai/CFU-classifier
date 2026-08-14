@@ -1,4 +1,4 @@
-path: /home/mzhai72/CFU_classifier/data/split_AI
+path: /home/mzhai72/CFU_classifier/data/tiled_3200_v4
 train: train/images
 val: val/images  
 
