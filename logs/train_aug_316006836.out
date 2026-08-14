@@ -1,0 +1,142 @@
+[KDownloading https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26m.pt to 'yolo26m.pt': 23% ━━╸───────── 9.9/42.2MB 99.1MB/s 0.1s<0.3s[KDownloading https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26m.pt to 'yolo26m.pt': 72% ━━━━━━━━╸─── 30.3/42.2MB 204.0MB/s 0.2s<0.1s[KDownloading https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26m.pt to 'yolo26m.pt': 100% ━━━━━━━━━━━━ 42.2MB 169.3MB/s 0.2s
+New https://pypi.org/project/ultralytics/8.4.120 available 😃 Update with 'pip install -U ultralytics'
+Ultralytics 8.4.41 🚀 Python-3.12.11 torch-2.11.0+cu130 CUDA:0 (NVIDIA A100-SXM4-80GB, 81153MiB)
+[34m[1mengine/trainer: [0magnostic_nms=False, amp=True, angle=1.0, augment=False, auto_augment=None, batch=16, bgr=0.0, box=7.5, cache=False, cfg=None, classes=None, close_mosaic=10, cls=0.5, cls_pw=0.0, compile=False, conf=None, copy_paste=0.0, copy_paste_mode=flip, cos_lr=False, cutmix=0.0, data=/research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data.yaml, degrees=180.0, deterministic=True, device=0, dfl=1.5, dnn=False, dropout=0.0, dynamic=False, embed=None, end2end=None, epochs=60, erasing=0.4, exist_ok=True, fliplr=0.5, flipud=0.5, format=torchscript, fraction=1.0, freeze=None, half=False, hsv_h=0.015, hsv_s=0.35, hsv_v=0.4, imgsz=3200, int8=False, iou=0.7, keras=False, kobj=1.0, line_width=None, lr0=0.01, lrf=0.01, mask_ratio=4, max_det=300, mixup=0.0, mode=train, model=yolo26m.pt, momentum=0.937, mosaic=1.0, multi_scale=0.0, name=cfu_detector, nbs=64, nms=False, opset=None, optimize=False, optimizer=auto, overlap_mask=True, patience=100, perspective=0.0, plots=True, pose=12.0, pretrained=True, profile=False, project=3200px_aug_training, rect=False, resume=False, retina_masks=False, rle=1.0, save=True, save_conf=False, save_crop=False, save_dir=/research/rgs01/home/clusterHome/mzhai72/CFU_classifier/runs/detect/3200px_aug_training/cfu_detector, save_frames=False, save_json=False, save_period=-1, save_txt=False, scale=0.5, seed=0, shear=0.0, show=False, show_boxes=True, show_conf=True, show_labels=True, simplify=True, single_cls=False, source=None, split=val, stream_buffer=False, task=detect, time=None, tracker=botsort.yaml, translate=0.1, val=True, verbose=True, vid_stride=1, visualize=False, warmup_bias_lr=0.1, warmup_epochs=3.0, warmup_momentum=0.8, weight_decay=0.0005, workers=8, workspace=None
+Overriding model.yaml nc=80 with nc=4
+
+                   from  n    params  module                                       arguments                     
+  0                  -1  1      1856  ultralytics.nn.modules.conv.Conv             [3, 64, 3, 2]                 
+  1                  -1  1     73984  ultralytics.nn.modules.conv.Conv             [64, 128, 3, 2]               
+  2                  -1  1    111872  ultralytics.nn.modules.block.C3k2            [128, 256, 1, True, 0.25]     
+  3                  -1  1    590336  ultralytics.nn.modules.conv.Conv             [256, 256, 3, 2]              
+  4                  -1  1    444928  ultralytics.nn.modules.block.C3k2            [256, 512, 1, True, 0.25]     
+  5                  -1  1   2360320  ultralytics.nn.modules.conv.Conv             [512, 512, 3, 2]              
+  6                  -1  1   1380352  ultralytics.nn.modules.block.C3k2            [512, 512, 1, True]           
+  7                  -1  1   2360320  ultralytics.nn.modules.conv.Conv             [512, 512, 3, 2]              
+  8                  -1  1   1380352  ultralytics.nn.modules.block.C3k2            [512, 512, 1, True]           
+  9                  -1  1    656896  ultralytics.nn.modules.block.SPPF            [512, 512, 5, 3, True]        
+ 10                  -1  1    990976  ultralytics.nn.modules.block.C2PSA           [512, 512, 1]                 
+ 11                  -1  1         0  torch.nn.modules.upsampling.Upsample         [None, 2, 'nearest']          
+ 12             [-1, 6]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 13                  -1  1   1642496  ultralytics.nn.modules.block.C3k2            [1024, 512, 1, True]          
+ 14                  -1  1         0  torch.nn.modules.upsampling.Upsample         [None, 2, 'nearest']          
+ 15             [-1, 4]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 16                  -1  1    542720  ultralytics.nn.modules.block.C3k2            [1024, 256, 1, True]          
+ 17                  -1  1    590336  ultralytics.nn.modules.conv.Conv             [256, 256, 3, 2]              
+ 18            [-1, 13]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 19                  -1  1   1511424  ultralytics.nn.modules.block.C3k2            [768, 512, 1, True]           
+ 20                  -1  1   2360320  ultralytics.nn.modules.conv.Conv             [512, 512, 3, 2]              
+ 21            [-1, 10]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 22                  -1  1   1974784  ultralytics.nn.modules.block.C3k2            [1024, 512, 1, True, 0.5, True]
+ 23        [16, 19, 22]  1   2804784  ultralytics.nn.modules.head.Detect           [4, 1, True, [256, 512, 512]] 
+YOLO26m summary: 280 layers, 21,779,056 parameters, 21,779,056 gradients, 74.7 GFLOPs
+
+Transferred 756/768 items from pretrained weights
+[34m[1mAMP: [0mrunning Automatic Mixed Precision (AMP) checks...
+[34m[1mAMP: [0mchecks passed ✅
+[34m[1mtrain: [0mFast image access ✅ (ping: 0.5±0.0 ms, read: 177.8±52.7 MB/s, size: 6132.4 KB)
+[K[34m[1mtrain: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/train/labels.cache... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 3.6Mit/s 0.0s
+[34m[1mval: [0mFast image access ✅ (ping: 0.4±0.0 ms, read: 176.6±82.8 MB/s, size: 5971.7 KB)
+[K[34m[1mval: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/val/labels.cache... 25 images, 75 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 99/99 3.2Mit/s 0.0s
+[34m[1moptimizer:[0m 'optimizer=auto' found, ignoring 'lr0=0.01' and 'momentum=0.937' and determining best 'optimizer', 'lr0' and 'momentum' automatically... 
+[34m[1moptimizer:[0m AdamW(lr=0.00125, momentum=0.9) with parameter groups 124 weight(decay=0.0), 136 weight(decay=0.0005), 136 bias(decay=0.0)
+Plotting labels to /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/runs/detect/3200px_aug_training/cfu_detector/labels.jpg... 
+Image sizes 3200 train, 3200 val
+Using 8 dataloader workers
+Logging results to [1m/research/rgs01/home/clusterHome/mzhai72/CFU_classifier/runs/detect/3200px_aug_training/cfu_detector[0m
+Starting training for 60 epochs...
+
+      Epoch    GPU_mem   box_loss   cls_loss   dfl_loss  Instances       Size
+WARNING ⚠️ CUDA out of memory with batch=16. Reducing to batch=8 and retrying (1/3).
+[34m[1mtrain: [0mFast image access ✅ (ping: 0.1±0.0 ms, read: 787.4±863.4 MB/s, size: 6612.8 KB)
+[K[34m[1mtrain: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/train/labels.cache... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 11.4Mit/s 0.0s
+[34m[1mval: [0mFast image access ✅ (ping: 0.0±0.0 ms, read: 1321.2±998.4 MB/s, size: 5556.4 KB)
+[K[34m[1mval: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/val/labels.cache... 25 images, 75 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 99/99 3.7Mit/s 0.0s
+[34m[1moptimizer:[0m 'optimizer=auto' found, ignoring 'lr0=0.01' and 'momentum=0.937' and determining best 'optimizer', 'lr0' and 'momentum' automatically... 
+[34m[1moptimizer:[0m AdamW(lr=0.00125, momentum=0.9) with parameter groups 124 weight(decay=0.0), 136 weight(decay=0.0005), 136 bias(decay=0.0)
+[K: 0% ──────────── 0/2  13.7s
+
+      Epoch    GPU_mem   box_loss   cls_loss   dfl_loss  Instances       Size
+WARNING ⚠️ CUDA out of memory with batch=8. Reducing to batch=4 and retrying (2/3).
+[34m[1mtrain: [0mFast image access ✅ (ping: 0.1±0.0 ms, read: 3786.6±2685.1 MB/s, size: 5098.7 KB)
+[K[34m[1mtrain: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/train/labels.cache... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 11.4Mit/s 0.0s
+[34m[1mval: [0mFast image access ✅ (ping: 0.0±0.0 ms, read: 3376.0±2772.4 MB/s, size: 5332.3 KB)
+[K[34m[1mval: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/val/labels.cache... 25 images, 75 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 99/99 3.9Mit/s 0.0s
+[34m[1moptimizer:[0m 'optimizer=auto' found, ignoring 'lr0=0.01' and 'momentum=0.937' and determining best 'optimizer', 'lr0' and 'momentum' automatically... 
+[34m[1moptimizer:[0m AdamW(lr=0.00125, momentum=0.9) with parameter groups 124 weight(decay=0.0), 136 weight(decay=0.0005), 136 bias(decay=0.0)
+[K: 0% ──────────── 0/4  13.2s
+
+      Epoch    GPU_mem   box_loss   cls_loss   dfl_loss  Instances       Size
+[K       1/60      75.6G      3.267       5.98   0.005632        641       3200: 0% ──────────── 0/8  38.9sWARNING ⚠️ CUDA out of memory with batch=4. Reducing to batch=2 and retrying (3/3).
+[34m[1mtrain: [0mFast image access ✅ (ping: 0.2±0.0 ms, read: 2749.3±1552.1 MB/s, size: 6265.6 KB)
+[K[34m[1mtrain: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/train/labels.cache... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 12.6Mit/s 0.0s
+[34m[1mval: [0mFast image access ✅ (ping: 0.0±0.0 ms, read: 2999.3±2880.9 MB/s, size: 7558.3 KB)
+[K[34m[1mval: [0mScanning /research/rgs01/home/clusterHome/mzhai72/CFU_classifier/data/split_AI/val/labels.cache... 25 images, 75 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 99/99 8.8Mit/s 0.0s
+[34m[1moptimizer:[0m 'optimizer=auto' found, ignoring 'lr0=0.01' and 'momentum=0.937' and determining best 'optimizer', 'lr0' and 'momentum' automatically... 
+[34m[1moptimizer:[0m AdamW(lr=0.00125, momentum=0.9) with parameter groups 124 weight(decay=0.0), 136 weight(decay=0.0005), 136 bias(decay=0.0)
+[K       1/60      75.6G      3.267       5.98   0.005632        641       3200: 12% ━─────────── 1/8 7.9s/it 41.3s<55.5s
+
+      Epoch    GPU_mem   box_loss   cls_loss   dfl_loss  Instances       Size
+[K: 0% ──────────── 0/15  1.2s
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@nodegpu215>
+Subject: Job 316006836: <cfu_train_3200_aug> in cluster <hpcf_research_cluster> Exited
+
+Job <cfu_train_3200_aug> was submitted from host <splprhpc11> by user <mzhai72> in cluster <hpcf_research_cluster> at Fri Aug 14 13:46:32 2026
+Job was executed on host(s) <4*nodegpu215>, in queue <gpu_short>, as user <mzhai72> in cluster <hpcf_research_cluster> at Fri Aug 14 13:46:36 2026
+</home/mzhai72> was used as the home directory.
+</home/mzhai72/CFU_classifier> was used as the working directory.
+Started at Fri Aug 14 13:46:36 2026
+Terminated at Fri Aug 14 13:49:17 2026
+Results reported at Fri Aug 14 13:49:17 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J cfu_train_3200_aug
+#BSUB -q gpu_short
+#BSUB -gpu "num=1"
+#BSUB -n 4
+#BSUB -R "rusage[mem=16000]"
+#BSUB -W 0:30
+#BSUB -o /home/mzhai72/CFU_classifier/logs/train_aug_%J.out
+#BSUB -e /home/mzhai72/CFU_classifier/logs/train_aug_%J.err
+
+mkdir -p /home/mzhai72/CFU_classifier/logs
+
+module load miniconda
+module load cuda11.8/toolkit/11.8.0
+source activate cfu-env
+
+cd /home/mzhai72/CFU_classifier
+
+python train_aug.py
+
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   1534.00 sec.
+    Max Memory :                                 59391 MB
+    Average Memory :                             14714.28 MB
+    Total Requested Memory :                     64000.00 MB
+    Delta Memory :                               4609.00 MB
+    Max Swap :                                   -
+    Max Processes :                              44
+    Max Threads :                                176
+    Run time :                                   156 sec.
+    Turnaround time :                            165 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </home/mzhai72/CFU_classifier/logs/train_aug_316006836.err> for stderr output of this job.
+

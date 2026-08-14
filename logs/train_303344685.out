@@ -569,3 +569,69 @@ YOLO26n summary (fused): 122 layers, 2,375,616 parameters, 0 gradients, 5.2 GFLO
                   GEMM          3          4          1          0          0          0
 Speed: 1.0ms preprocess, 15.3ms inference, 0.0ms loss, 0.1ms postprocess per image
 Results saved to [1m/research/rgs01/home/clusterHome/mzhai72/CFU_classifier/runs/detect/3200px_training_v4/cfu_detector[0m
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@nodegpu250>
+Subject: Job 303344685: <cfu_train_3200> in cluster <hpcf_research_cluster> Done
+
+Job <cfu_train_3200> was submitted from host <splprhpc12> by user <mzhai72> in cluster <hpcf_research_cluster> at Mon Jul 20 17:30:37 2026
+Job was executed on host(s) <1*nodegpu250>, in queue <gpu_priority>, as user <mzhai72> in cluster <hpcf_research_cluster> at Mon Jul 20 17:30:39 2026
+                            <1*dgxac09>
+                            <1*dgxac08>
+                            <1*nodegpu251>
+</home/mzhai72> was used as the home directory.
+</home/mzhai72/CFU_classifier> was used as the working directory.
+Started at Mon Jul 20 17:30:39 2026
+Terminated at Mon Jul 20 17:43:40 2026
+Results reported at Mon Jul 20 17:43:40 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J cfu_train_3200
+#BSUB -q gpu_priority
+#BSUB -gpu "num=2:j_exclusive=yes"
+#BSUB -n 4
+#BSUB -R "rusage[mem=16000]"
+#BSUB -W 8:00
+#BSUB -o /home/mzhai72/CFU_classifier/logs/train_%J.out
+#BSUB -e /home/mzhai72/CFU_classifier/logs/train_%J.err
+
+mkdir -p /home/mzhai72/CFU_classifier/logs
+
+module load miniconda
+module load cuda11.8/toolkit/11.8.0
+source activate cfu-env
+
+cd /home/mzhai72/CFU_classifier
+
+python train.py
+
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   5762.00 sec.
+    Max Memory :                                 44904 MB
+    Average Memory :                             22127.13 MB
+    Total Requested Memory :                     64000.00 MB
+    Delta Memory :                               19096.00 MB
+    Max Swap :                                   -
+    Max Processes :                              55
+    Max Threads :                                359
+    Run time :                                   764 sec.
+    Turnaround time :                            783 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </home/mzhai72/CFU_classifier/logs/train_303344685.err> for stderr output of this job.
+
