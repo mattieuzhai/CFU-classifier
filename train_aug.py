@@ -13,7 +13,7 @@ from ultralytics import YOLO
 #                                   domain-valid variety.
 # Writes to its own project folder so it never overwrites the baseline v4 run.
 
-model = YOLO("yolo26n.pt")  # nano detection model
+model = YOLO("yolo26m.pt")  # nano detection model
 
 model.train(
     data=str(Path(__file__).parent / "data.yaml"),  # same tiled dataset as baseline

@@ -8,9 +8,15 @@ the CVAT auto-annotation service uses: plate photos are ~6400x6400 with colonies
 that are tiny relative to the frame, so a single downscaled pass loses them.
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
+
+# Let unsupported Apple-GPU (MPS) ops fall back to CPU instead of raising, so
+# Apple Silicon Macs can use the GPU without op-coverage surprises. Must be set
+# before torch is imported (ultralytics/torch are imported lazily below).
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
 # Detection settings that work for the whole-plate CFU model. These match the
 # values deployed in nuc/function.yaml.
@@ -23,6 +29,23 @@ DEFAULT_NMS_CONTAIN = 0.40
 
 class ModelError(Exception):
     """The chosen file can't be used as a detection model."""
+
+
+def _select_device():
+    """Pick the fastest available torch device: CUDA > Apple MPS > CPU."""
+    try:
+        import torch
+    except Exception:
+        return "cpu"
+    try:
+        if torch.cuda.is_available():
+            return "cuda"
+        mps = getattr(torch.backends, "mps", None)
+        if mps is not None and mps.is_available():
+            return "mps"
+    except Exception:
+        pass
+    return "cpu"
 
 
 def _nms(boxes, scores, iou_thresh):
@@ -114,6 +137,10 @@ class Detector:
                 f"Could not load '{self.path.name}' as a YOLO model.\n\n{exc}"
             ) from exc
 
+        # Run on the GPU when there is one (Apple MPS on this Mac, CUDA on a
+        # server); Ultralytics otherwise defaults to CPU.
+        self.device = _select_device()
+
         self.task = getattr(self.model, "task", None) or "unknown"
         if self.task != "detect":
             raise ModelError(
@@ -143,7 +170,10 @@ class Detector:
             )
 
     def __repr__(self):
-        return f"<Detector {self.path.name} task={self.task} classes={self.class_names}>"
+        return (
+            f"<Detector {self.path.name} task={self.task} "
+            f"device={self.device} classes={self.class_names}>"
+        )
 
     # -- inference ----------------------------------------------------------
 
@@ -179,7 +209,9 @@ class Detector:
         if single_pass:
             if progress:
                 progress(0, 1)
-            result = self.model.predict(source=image, conf=conf, verbose=False)[0]
+            result = self.model.predict(
+                source=image, conf=conf, device=self.device, verbose=False
+            )[0]
             dets = [
                 {
                     "cls": int(b.cls[0]),
@@ -207,7 +239,8 @@ class Detector:
                     (x0, y0, min(x0 + tile_size, width), min(y0 + tile_size, height))
                 )
                 result = self.model.predict(
-                    source=tile, conf=conf, imgsz=tile_size, verbose=False
+                    source=tile, conf=conf, imgsz=tile_size,
+                    device=self.device, verbose=False
                 )[0]
                 for b in result.boxes:
                     bx1, by1, bx2, by2 = b.xyxy[0].tolist()
