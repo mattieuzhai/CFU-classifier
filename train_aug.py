@@ -12,7 +12,7 @@ from ultralytics import YOLO
 #     0 -> 180                       vertical flip + full rotation are free,
 #                                   domain-valid variety.
 # Writes to its own project folder so it never overwrites the baseline v4 run.
-project_name = "3200px_yoloM"
+project_name = "3200px_yoloM1"
 checkpoint = Path(__file__).parent / "runs" / "detect" / project_name / "cfu_detector" / "weights" / "last.pt"
 
 if checkpoint.exists():
@@ -26,7 +26,7 @@ else:
     model.train(
         data=str(Path(__file__).parent / "data.yaml"),  # same tiled dataset as baseline
         epochs=80,
-        imgsz=3200,
+        imgsz=1600,
         batch=8,
         device=[0],   # 2 GPUs (matches train.bsub num=6)
 
