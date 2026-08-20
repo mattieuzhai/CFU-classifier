@@ -1,6 +1,6 @@
 #!/bin/bash
-#BSUB -J cfu_train_3200_aug
-#BSUB -q gpu_priority
+#BSUB -J cfu_train_2400_aug
+#BSUB -q gpu
 #BSUB -gpu "num=1"
 #BSUB -n 4
 #BSUB -R "select[a100_80g] rusage[mem=16000]"
