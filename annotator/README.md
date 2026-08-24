@@ -494,8 +494,15 @@ cd "/Users/mzhai72/Desktop/SC-RNA Seq/CFU-classifier/annotator" && ../.venv/bin/
 ```
 
 `tests/test_core.py` covers scanning, model validation, the export files and
-projects; `tests/test_ui.py` drives the window with real mouse events;
-`tests/test_canvas_geometry.py` guards the crash described below.
+projects; `tests/test_ui.py`, `test_v4.py` and `test_v5.py` drive the window
+with real mouse and key events; `tests/test_canvas_geometry.py` guards the zoom
+crash described below; `tests/test_inference.py` runs the real model through the
+real worker, which is the only test that would have caught the 1.4.0 crash.
+
+**If you add a detection setting**, put it in `_predict_kwargs()` only if
+`Detector.predict()` accepts it. `_detection_settings()` is for the record — it
+carries extra bookkeeping and must never be handed to the model. `InferenceWorker`
+enforces that boundary, and `test_inference.py` checks the signatures agree.
 
 ### One rule to keep in mind when editing `canvas.py`
 
@@ -514,6 +521,7 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.4.1 | Fixed a crash on every annotate run in 1.4.0 (`unexpected keyword argument 'labelling'`) |
 | 1.4.0 | Three labelling modes, including detector-only; Tab/Enter review workflow; export blocked while boxes are unlabelled |
 | 1.3.0 | Export folders can be named; plates can be marked contaminated; ⌘Z undo; existing YOLO labels can be pre-loaded |
 | 1.2.0 | Exports go into their own dated folder; annotated images can be exported; the draw tool returns to Select after each box; settings are remembered between launches |
