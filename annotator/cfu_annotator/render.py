@@ -66,7 +66,14 @@ def render(source_path, boxes, class_names, dest_path, show_confidence=False):
         painter.drawRect(rect)
 
         index = int(box["cls"])
-        text = class_names[index] if 0 <= index < len(class_names) else f"class {index}"
+        if index < 0:
+            text = "?"
+        elif index < len(class_names):
+            text = class_names[index]
+        else:
+            text = f"class {index}"
+        if box.get("unconfirmed") and index >= 0:
+            text = f"{text}?"
         if show_confidence and box.get("conf") is not None:
             text = f"{text} {box['conf']:.2f}"
 

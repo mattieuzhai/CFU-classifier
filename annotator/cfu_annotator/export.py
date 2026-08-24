@@ -103,10 +103,17 @@ def _format_params(params):
     if not params:
         return ["    (not recorded)"]
     tiling = params.get("tiling", True)
+    labelling = {
+        "model": "model's labels used as-is",
+        "suggest": "model suggested, confirmed by hand",
+        "manual": "detection only, labelled by hand",
+    }.get(params.get("labelling"), params.get("labelling"))
     lines = [
         f"    Confidence threshold : {params.get('conf', '?')}",
         f"    Tiling               : {'on' if tiling else 'off'}",
     ]
+    if labelling:
+        lines.append(f"    Labelling            : {labelling}")
     if tiling:
         lines += [
             f"    Tile size            : {params.get('tile_size', '?')} px",
@@ -244,6 +251,8 @@ def write_yolo(output_folder, class_names, records, image_sizes):
 
         lines = []
         for box in record["boxes"]:
+            if box["cls"] < 0:
+                continue          # unlabelled: no valid YOLO class id exists
             x1, y1, x2, y2 = box["xyxy"]
             x1, x2 = sorted((max(0.0, x1), min(float(width), x2)))
             y1, y2 = sorted((max(0.0, y1), min(float(height), y2)))

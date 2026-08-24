@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFileDialog,
     QFrame,
@@ -40,10 +41,17 @@ from . import (
     APP_NAME, __version__, detector as det, export, labels as labels_io,
     project, render, scan, settings as prefs, status,
 )
-from .canvas import MODE_DRAW, MODE_SELECT, ImageCanvas, class_color
+from .canvas import (
+    MODE_DRAW, MODE_SELECT, UNLABELLED, ImageCanvas, class_color,
+)
 from .workers import ImageExportWorker, InferenceWorker, ModelLoadWorker
 
 UNDO_DEPTH = 100       # plenty for a session's worth of hand corrections
+
+# What to do with the classes the model predicts.
+LABEL_MODE_MODEL = "model"        # trust them
+LABEL_MODE_SUGGEST = "suggest"    # show them, but make the user agree
+LABEL_MODE_MANUAL = "manual"      # discard them; the user labels everything
 
 HINT = "color: #666;"
 OK = "color: #1a7f37; font-weight: bold;"
@@ -418,6 +426,8 @@ class MainWindow(QMainWindow):
             "<tr><td><b>W</b></td><td>draw a new box</td></tr>"
             "<tr><td><b>Esc</b></td><td>back to select mode</td></tr>"
             "<tr><td><b>1</b>–<b>9</b></td><td>relabel selected box</td></tr>"
+            "<tr><td><b>Tab</b></td><td>next unlabelled box</td></tr>"
+            "<tr><td><b>Enter</b></td><td>accept suggested label</td></tr>"
             "<tr><td><b>Delete</b></td><td>remove selected box</td></tr>"
             "<tr><td><b>R</b></td><td>run the model</td></tr>"
             "<tr><td><b>A</b> / <b>D</b></td><td>previous / next image</td></tr>"
@@ -540,6 +550,22 @@ class MainWindow(QMainWindow):
         group = QGroupBox("4.  Detection")
         layout = QVBoxLayout(group)
 
+        self.combo_labelling = QComboBox()
+        self.combo_labelling.addItem("Model labels the colonies", LABEL_MODE_MODEL)
+        self.combo_labelling.addItem("Suggest labels — I confirm", LABEL_MODE_SUGGEST)
+        self.combo_labelling.addItem("Detect only — I label", LABEL_MODE_MANUAL)
+        self.combo_labelling.setToolTip(
+            "What to do with the classes the model predicts.\n\n"
+            "• Model labels: trust them (the default).\n"
+            "• Suggest: boxes arrive dashed with the predicted label and a '?'; "
+            "Tab steps through them, Enter accepts, 1-9 overrides.\n"
+            "• Detect only: the model finds the colonies, every box arrives grey "
+            "and unlabelled, and you assign every label.\n\n"
+            "Detection itself is identical in all three — only the labels differ."
+        )
+        self.combo_labelling.currentIndexChanged.connect(self._on_label_mode_changed)
+        layout.addWidget(self.combo_labelling)
+
         conf_row = QHBoxLayout()
         conf_row.addWidget(QLabel("Confidence"))
         self.spin_conf = QDoubleSpinBox()
@@ -634,6 +660,12 @@ class MainWindow(QMainWindow):
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         layout.addWidget(self.table_counts)
+        self.label_pending = QLabel("")
+        self.label_pending.setWordWrap(True)
+        self.label_pending.setStyleSheet("color: #b35c00;")
+        self.label_pending.setVisible(False)
+        layout.addWidget(self.label_pending)
+
         self.label_progress_summary = QLabel("")
         self.label_progress_summary.setWordWrap(True)
         self.label_progress_summary.setStyleSheet(HINT)
@@ -1216,6 +1248,7 @@ class MainWindow(QMainWindow):
 
     def _detection_settings(self):
         return {
+            "labelling": self.label_mode(),
             "conf": self.spin_conf.value(),
             "tiling": self.check_tiling.isChecked(),
             "tile_size": self.spin_tile.value(),
@@ -1317,8 +1350,37 @@ class MainWindow(QMainWindow):
             f"tile %v of %m" if total > 1 else "running…"
         )
 
+    def label_mode(self):
+        return self.combo_labelling.currentData() or LABEL_MODE_MODEL
+
+    def _apply_label_mode(self, detections):
+        """Rework fresh detections according to the labelling mode."""
+        mode = self.label_mode()
+        if mode == LABEL_MODE_MODEL:
+            return detections
+        out = []
+        for box in detections:
+            box = dict(box)
+            if mode == LABEL_MODE_MANUAL:
+                box["cls"] = UNLABELLED       # geometry only; label it yourself
+            box["unconfirmed"] = True
+            out.append(box)
+        return out
+
+    def _on_label_mode_changed(self):
+        mode = self.label_mode()
+        self._save_settings()
+        self._show_status({
+            LABEL_MODE_MODEL: "The model's labels will be used as-is",
+            LABEL_MODE_SUGGEST: "The model's labels will arrive as suggestions — "
+                                "Tab to step through them, Enter to accept",
+            LABEL_MODE_MANUAL: "The model will find colonies only — Tab to step "
+                               "through them, 1-9 to label",
+        }[mode])
+
     def _on_image_done(self, name, detections):
         self._push_undo(name)     # re-running the model is undoable
+        detections = self._apply_label_mode(detections)
         # A fresh model run resets the 'edited by hand' flag: the boxes on screen
         # are the model's again. Settings used are kept per image so the export
         # log can report what actually produced each result.
@@ -1393,6 +1455,7 @@ class MainWindow(QMainWindow):
             "output_folder": str(self.output_folder) if self.output_folder else None,
             "labels_folder": str(self.labels_folder) if self.labels_folder else None,
             "export_name": self.edit_export_name.text() or None,
+            "label_mode": self.label_mode(),
             "conf": self.spin_conf.value(),
             "tiling": self.check_tiling.isChecked(),
             "tile_size": self.spin_tile.value(),
@@ -1432,6 +1495,12 @@ class MainWindow(QMainWindow):
         self.check_conf.setChecked(prefs.get_bool(values, "show_confidence", False))
         self.check_sticky.setChecked(prefs.get_bool(values, "sticky_draw", False))
         self.edit_export_name.setText(prefs.get_str(values, "export_name", "") or "")
+        wanted = prefs.get_str(values, "label_mode", LABEL_MODE_MODEL)
+        index = self.combo_labelling.findData(wanted)
+        if index >= 0:
+            self.combo_labelling.blockSignals(True)
+            self.combo_labelling.setCurrentIndex(index)
+            self.combo_labelling.blockSignals(False)
 
         restored, missing = [], []
 
@@ -1693,6 +1762,46 @@ class MainWindow(QMainWindow):
             return
 
         self._store_current()
+
+        # An unlabelled box has no class to put in a column or a YOLO id, so a
+        # spreadsheet produced now would quietly under-count. Refuse rather than
+        # hand over numbers that look complete.
+        pending = self._images_with_unlabelled()
+        if pending:
+            total = sum(count for _, count in pending)
+            listed = "\n".join(f"    {n}  ({c} box(es))" for n, c in pending[:10])
+            more = f"\n    …and {len(pending) - 10} more" if len(pending) > 10 else ""
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Warning)
+            box.setWindowTitle("Unlabelled boxes")
+            box.setText(f"{total} box(es) on {len(pending)} image(s) have no label yet.")
+            box.setInformativeText(
+                f"Export is blocked until every box has a class, so the counts "
+                f"can't come out looking complete when they aren't.\n\n"
+                f"{listed}{more}\n\nOn each image, press Tab to jump to the "
+                f"next unlabelled box and 1-{max(1, len(self.canvas.class_names))} "
+                f"to label it."
+            )
+            go = box.addButton("Go to the first one", QMessageBox.AcceptRole)
+            box.addButton(QMessageBox.Cancel)
+            box.exec_()
+            if box.clickedButton() is go:
+                self._go_to_first_unlabelled()
+            return
+
+        unconfirmed = self._images_with_unconfirmed()
+        if unconfirmed:
+            total = sum(count for _, count in unconfirmed)
+            answer = QMessageBox.question(
+                self, "Suggested labels not yet confirmed",
+                f"{total} box(es) on {len(unconfirmed)} image(s) still carry the "
+                f"model's suggested label rather than one you have agreed with.\n\n"
+                f"They export with the suggested class. Export anyway?",
+                QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel,
+            )
+            if answer != QMessageBox.Yes:
+                return
+
         if want_yolo:
             self._ensure_image_sizes()
 
@@ -1846,6 +1955,41 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _reveal(path):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+    def _images_with_unlabelled(self):
+        """[(image name, count)] for every image holding an unlabelled box."""
+        found = []
+        for path in self.images:
+            record = self.records.get(path.name)
+            if not record:
+                continue
+            count = sum(1 for b in record.get("boxes") or [] if b["cls"] < 0)
+            if count:
+                found.append((path.name, count))
+        return found
+
+    def _images_with_unconfirmed(self):
+        found = []
+        for path in self.images:
+            record = self.records.get(path.name)
+            if not record:
+                continue
+            count = sum(1 for b in record.get("boxes") or []
+                        if b.get("unconfirmed") and b["cls"] >= 0)
+            if count:
+                found.append((path.name, count))
+        return found
+
+    def _go_to_first_unlabelled(self):
+        pending = self._images_with_unlabelled()
+        if not pending:
+            return
+        row = next((i for i, p in enumerate(self.images)
+                    if p.name == pending[0][0]), None)
+        if row is not None:
+            self._go_to(row)
+            self.canvas.setFocus()
+            self.canvas.focus_next_unresolved()
 
     def _ensure_image_sizes(self):
         """YOLO labels are normalised, so every annotated image needs its size.
@@ -2002,6 +2146,21 @@ class MainWindow(QMainWindow):
             value.setFont(font)
             self.table_counts.setItem(len(names), 0, total)
             self.table_counts.setItem(len(names), 1, value)
+
+        pending = self.canvas.unlabelled_count()
+        unconfirmed = self.canvas.unconfirmed_count()
+        if pending or unconfirmed:
+            bits = []
+            if pending:
+                bits.append(f"<b>{pending} unlabelled</b>")
+            if unconfirmed:
+                bits.append(f"{unconfirmed} unconfirmed")
+            self.label_pending.setText(
+                " · ".join(bits) + " — Tab to step through them"
+            )
+            self.label_pending.setVisible(True)
+        else:
+            self.label_pending.setVisible(False)
 
         if self.images:
             tally = {}
