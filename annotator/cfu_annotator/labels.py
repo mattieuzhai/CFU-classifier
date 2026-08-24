@@ -22,6 +22,31 @@ LABEL_SUFFIX = ".txt"
 SIDECAR_NAMES = {"classes.txt", "notes.txt", "predefined_classes.txt"}
 
 
+def read_class_list(path):
+    """Read a labelImg-style class list: one class name per line.
+
+    Blank lines and `#` comments are skipped. Returns (names, skipped_count).
+    Raises OSError if the file can't be read, ValueError if it holds no names.
+    """
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    names, skipped = [], 0
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            skipped += 1
+            continue
+        if line in names:
+            skipped += 1          # a duplicate would shadow an earlier index
+            continue
+        names.append(line)
+    if not names:
+        raise ValueError(
+            f"'{Path(path).name}' holds no class names. Expected one name per "
+            f"line, as labelImg writes classes.txt."
+        )
+    return names, skipped
+
+
 class ImportReport:
     """What happened during an import, for a plain-English summary."""
 

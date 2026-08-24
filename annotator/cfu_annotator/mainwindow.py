@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -81,6 +82,9 @@ class MainWindow(QMainWindow):
         self.image_folder = None
         self.output_folder = None
         self.labels_folder = None
+        # A class list the user supplied, which a model must not overwrite.
+        self.custom_classes = False
+        self.class_list_source = None
         self.images = []               # list[Path]
         self.index = -1
         self.detector = None
@@ -641,8 +645,32 @@ class MainWindow(QMainWindow):
         self.button_apply_class.setEnabled(False)
         self.button_apply_class.clicked.connect(self._apply_class_to_selection)
 
+        class_row = QHBoxLayout()
+        self.button_load_classes = QPushButton("Load list…")
+        self.button_load_classes.setToolTip(
+            "Use your own class list instead of the model's: a .txt file with "
+            "one class name per line, exactly as labelImg writes classes.txt.\n\n"
+            "Your list then drives the labels, the count columns and the "
+            "exported classes.txt — so the app can annotate anything, with or "
+            "without a model."
+        )
+        self.button_load_classes.clicked.connect(self.choose_class_list)
+        self.button_add_class = QPushButton("Add…")
+        self.button_add_class.setToolTip("Add one more class to the list")
+        self.button_add_class.clicked.connect(self.add_class)
+        class_row.addWidget(self.button_load_classes, 1)
+        class_row.addWidget(self.button_add_class)
+
+        self.label_class_source = QLabel(
+            "No classes yet — load a model, or load your own list."
+        )
+        self.label_class_source.setWordWrap(True)
+        self.label_class_source.setStyleSheet(HINT)
+
         layout.addWidget(hint)
         layout.addWidget(self.list_classes)
+        layout.addLayout(class_row)
+        layout.addWidget(self.label_class_source)
         layout.addWidget(self.label_selected)
         layout.addWidget(self.button_apply_class)
         return group
@@ -840,6 +868,72 @@ class MainWindow(QMainWindow):
             )
         return True
 
+    def choose_class_list(self):
+        """Use a labelImg-style classes.txt instead of the model's classes."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose a class list (one class name per line)",
+            str(self.image_folder or Path.home()),
+            "Class list (*.txt);;All files (*)",
+        )
+        if not path:
+            return
+        try:
+            names, skipped = labels_io.read_class_list(path)
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Cannot use that class list", str(exc))
+            return
+
+        stranded = self._boxes_outside(len(names))
+        if stranded:
+            answer = QMessageBox.question(
+                self, "Existing boxes use higher class numbers",
+                f"{stranded} existing box(es) have a class number beyond the "
+                f"{len(names)} class(es) in this list.\n\nThey keep their "
+                f"number, but will show as unnamed and won't be counted until "
+                f"they are relabelled.\n\nUse this list anyway?",
+                QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel,
+            )
+            if answer != QMessageBox.Yes:
+                return
+
+        self._set_class_names(names, custom=True, source=Path(path).name)
+        self._mark_dirty()
+        self._save_settings()
+        note = f"Using {len(names)} class(es) from {Path(path).name}"
+        if skipped:
+            note += f" ({skipped} blank/duplicate line(s) skipped)"
+        self._show_status(note)
+
+    def add_class(self):
+        """Append one more class, without editing a file."""
+        name, ok = QInputDialog.getText(self, "Add a class", "Class name:")
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        existing = list(self.canvas.class_names)
+        if name in existing:
+            self._show_status(f"'{name}' is already in the class list")
+            return
+        self._set_class_names(
+            existing + [name], custom=True,
+            source=self.class_list_source or "your additions",
+        )
+        self.list_classes.setCurrentRow(len(existing))
+        self._mark_dirty()
+        self._save_settings()
+        self._show_status(
+            f"Added '{name}' as class {len(existing) + 1} — press "
+            f"{len(existing) + 1} to apply it"
+        )
+
+    def _boxes_outside(self, count):
+        """How many existing boxes carry a class id at or beyond `count`."""
+        total = 0
+        for record in self.records.values():
+            total += sum(1 for b in record.get("boxes") or []
+                         if b["cls"] >= count)
+        return total
+
     def choose_model(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Choose a YOLO model file", str(Path.home()),
@@ -869,8 +963,16 @@ class MainWindow(QMainWindow):
         self.model_worker.failed.connect(self._on_model_failed)
         self.model_worker.start()
 
-    def _set_class_names(self, names):
-        """Populate the class list. Also used when a project supplies the names."""
+    def _set_class_names(self, names, custom=None, source=None):
+        """Populate the class list.
+
+        `custom` marks the list as the user's own, which means a model loaded
+        later must not replace it — in detect-only work the model contributes
+        geometry, not vocabulary.
+        """
+        if custom is not None:
+            self.custom_classes = bool(custom)
+            self.class_list_source = source
         self.canvas.set_class_names(names)
         self.list_classes.blockSignals(True)
         self.list_classes.clear()
@@ -880,6 +982,17 @@ class MainWindow(QMainWindow):
         self.list_classes.blockSignals(False)
         if names:
             self.list_classes.setCurrentRow(0)
+        if self.custom_classes:
+            where = f" from {self.class_list_source}" if self.class_list_source else ""
+            self.label_class_source.setText(
+                f"Using your own list of {len(names)} class(es){where}."
+            )
+        elif names:
+            self.label_class_source.setText("Using the model's classes.")
+        else:
+            self.label_class_source.setText(
+                "No classes yet — load a model, or load your own list."
+            )
         self._refresh_counts()
 
     def _on_model_loaded(self, detector):
@@ -892,7 +1005,18 @@ class MainWindow(QMainWindow):
             f"<span style='color:#666'>{', '.join(detector.class_names)}</span>"
         )
         self.label_model.setStyleSheet("")
-        self._set_class_names(detector.class_names)
+        if self.custom_classes:
+            # Detect-only work: the model supplies boxes, the user supplies the
+            # vocabulary. Replacing their list here would silently rename boxes.
+            self._set_class_names(self.canvas.class_names)
+            if detector.class_names != self.canvas.class_names:
+                self._show_status(
+                    f"Model ready: {detector.path.name} — keeping your own "
+                    f"{len(self.canvas.class_names)} class(es); the model's "
+                    f"labels are only used in 'Model labels' mode."
+                )
+        else:
+            self._set_class_names(detector.class_names)
         self._update_enabled_state()
         self._save_settings()
         if self._restore_note:
@@ -901,7 +1025,8 @@ class MainWindow(QMainWindow):
         else:
             self._show_status(f"Model ready: {detector.path.name}")
 
-        if previous and previous != detector.class_names and self.records:
+        if (not self.custom_classes and previous
+                and previous != detector.class_names and self.records):
             QMessageBox.warning(
                 self, "Class names differ",
                 "This model's classes are not the ones the existing annotations "
@@ -1467,6 +1592,10 @@ class MainWindow(QMainWindow):
             "labels_folder": str(self.labels_folder) if self.labels_folder else None,
             "export_name": self.edit_export_name.text() or None,
             "label_mode": self.label_mode(),
+            "custom_classes": self.custom_classes,
+            "class_names": "\n".join(self.canvas.class_names)
+                           if self.custom_classes else None,
+            "class_list_source": self.class_list_source,
             "conf": self.spin_conf.value(),
             "tiling": self.check_tiling.isChecked(),
             "tile_size": self.spin_tile.value(),
@@ -1514,6 +1643,19 @@ class MainWindow(QMainWindow):
             self.combo_labelling.blockSignals(False)
 
         restored, missing = [], []
+
+        # After `restored` exists: a saved class list is restored before the
+        # model, so loading the model can see it and leave it alone.
+        if prefs.get_bool(values, "custom_classes", False):
+            saved = (prefs.get_str(values, "class_names", "") or "").split("\n")
+            saved = [n for n in saved if n]
+            if saved:
+                self._set_class_names(
+                    saved, custom=True,
+                    source=prefs.get_str(values, "class_list_source"),
+                )
+                restored.append(f"{len(saved)} class(es)")
+
 
         output = prefs.get_str(values, "output_folder")
         if output and Path(output).is_dir():
@@ -1586,6 +1728,8 @@ class MainWindow(QMainWindow):
             },
             detection=self._detection_settings(),
             class_names=self.canvas.class_names,
+            custom_classes=self.custom_classes,
+            class_list_source=self.class_list_source,
             records=self.records,
             image_sizes=self.image_sizes,
         )
@@ -1602,6 +1746,8 @@ class MainWindow(QMainWindow):
         self.project_path = None
         self.dirty = False
         self.labels_folder = None
+        self.custom_classes = False
+        self.class_list_source = None
         self._undo_stack = []
         self._pre_edit = None
         self._refresh_undo_action()
@@ -1702,7 +1848,11 @@ class MainWindow(QMainWindow):
         # Class names from the project, so saved boxes are readable even if the
         # model file has since moved.
         if data["class_names"]:
-            self._set_class_names(data["class_names"])
+            self._set_class_names(
+                data["class_names"],
+                custom=bool(data.get("custom_classes")),
+                source=data.get("class_list_source"),
+            )
 
         problems = []
 
@@ -1834,10 +1984,9 @@ class MainWindow(QMainWindow):
             )
             return
 
-        class_names = (
-            self.detector.class_names if self.detector
-            else [f"class_{i}" for i in range(len(self.canvas.class_names))]
-        )
+        # The canvas holds whichever list is in force — the model's, or the
+        # user's own when they loaded one.
+        class_names = list(self.canvas.class_names)
         image_names = [p.name for p in self.images]
         written = []
         try:
