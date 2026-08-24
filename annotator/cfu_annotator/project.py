@@ -47,6 +47,7 @@ def save(path, *, image_folder, model_path, output_folder, export_options,
             "annotated": bool(record.get("annotated")),
             "edited": bool(record.get("edited")),
             "finalized": bool(record.get("finalized")),
+            "contaminated": bool(record.get("contaminated")),
         }
         if name in image_sizes:
             entry["size"] = list(image_sizes[name])
@@ -108,6 +109,7 @@ def load(path):
             "annotated": bool(entry.get("annotated")),
             "edited": bool(entry.get("edited")),
             "finalized": bool(entry.get("finalized")),
+            "contaminated": bool(entry.get("contaminated")),
             "model": entry.get("model"),
             "params": entry.get("params"),
         }

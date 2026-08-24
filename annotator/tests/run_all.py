@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-FILES = ["test_core.py", "test_canvas_geometry.py", "test_ui.py"]
+FILES = ["test_core.py", "test_canvas_geometry.py", "test_ui.py", "test_v4.py"]
 
 
 def main():

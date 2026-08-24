@@ -4,7 +4,7 @@ import csv
 from datetime import datetime
 from pathlib import Path
 
-from .status import status_of
+from .status import CONTAMINATED, ORDER as STATUS_ORDER, status_of
 
 CSV_NAME = "CFU_counts.csv"
 YOLO_DIRNAME = "yolo_labels"
@@ -13,6 +13,9 @@ INFO_NAME = "export_info.txt"
 
 EXPORT_PREFIX = "CFU_export"
 
+# Characters a folder name can't contain (or that make paths miserable).
+_ILLEGAL = set('/\\:*?"<>|')
+
 
 def export_dir_name(when=None):
     """Timestamped folder name, e.g. CFU_export_2026-07-27_1642."""
@@ -20,15 +23,30 @@ def export_dir_name(when=None):
     return f"{EXPORT_PREFIX}_{when.strftime('%Y-%m-%d_%H%M')}"
 
 
-def make_export_dir(output_folder, when=None):
+def clean_folder_name(name):
+    """Turn whatever the user typed into a usable folder name, or '' if empty.
+
+    Keeps their wording — spaces and dashes included — but drops path
+    separators and characters that break on other platforms, so a name typed
+    here still opens on a Windows share.
+    """
+    if not name:
+        return ""
+    cleaned = "".join("-" if ch in _ILLEGAL else ch for ch in str(name))
+    cleaned = cleaned.replace("\n", " ").replace("\t", " ").strip(" .-")
+    return cleaned[:120].strip(" .-")
+
+
+def make_export_dir(output_folder, name=None, when=None):
     """Create a fresh, uniquely named folder for one export.
 
-    Every export gets its own folder, so a re-run never quietly overwrites the
-    numbers someone already pasted into a figure. If two exports land in the
-    same minute the second gets a -2 suffix rather than clobbering the first.
+    Uses `name` when given, otherwise a timestamp. Every export gets its own
+    folder, so a re-run never quietly overwrites numbers someone already
+    pasted into a figure: a name that is already taken gains a -2 suffix
+    rather than clobbering what is there.
     """
     parent = Path(output_folder)
-    base = export_dir_name(when)
+    base = clean_folder_name(name) or export_dir_name(when)
     target = parent / base
     attempt = 2
     while target.exists():
@@ -179,7 +197,7 @@ def write_run_info(output_folder, *, app_version, project_path, image_folder,
         f"Image folder      : {image_folder}",
         f"Images in folder  : {len(image_names)}",
     ]
-    for key in ("annotated", "edited", "finalized", "not_annotated"):
+    for key in STATUS_ORDER:
         if key in by_status:
             lines.append(f"  {key:<16}: {by_status[key]}")
 
@@ -215,6 +233,8 @@ def write_yolo(output_folder, class_names, records, image_sizes):
     for name, record in records.items():
         if not record.get("annotated"):
             continue
+        if status_of(record) == CONTAMINATED:
+            continue        # a discarded plate must not become training data
         size = image_sizes.get(name)
         if not size:
             continue
