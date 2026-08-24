@@ -32,11 +32,24 @@ class InferenceWorker(QThread):
     image_failed = pyqtSignal(str, str)           # name, error
     all_done = pyqtSignal(bool)                   # True if cancelled
 
+    #: The only keys forwarded to Detector.predict. Anything else is a caller
+    #: bug — bookkeeping such as the labelling mode belongs on the record, not
+    #: in the model call.
+    PREDICT_KEYS = ("conf", "tiling", "tile_size", "tile_overlap",
+                    "nms_iou", "nms_contain")
+
     def __init__(self, detector, image_paths, settings, parent=None):
         super().__init__(parent)
         self.detector = detector
         self.image_paths = list(image_paths)
-        self.settings = dict(settings)
+        unknown = sorted(set(settings) - set(self.PREDICT_KEYS))
+        if unknown:
+            raise TypeError(
+                f"InferenceWorker got settings the model cannot use: "
+                f"{', '.join(unknown)}. Pass only {', '.join(self.PREDICT_KEYS)}."
+            )
+        self.settings = {k: v for k, v in settings.items()
+                         if k in self.PREDICT_KEYS}
         self._stop = False
 
     def cancel(self):

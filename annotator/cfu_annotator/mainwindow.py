@@ -1246,14 +1246,25 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------ inference
 
-    def _detection_settings(self):
+    def _predict_kwargs(self):
+        """Exactly the arguments Detector.predict accepts — nothing else.
+
+        Kept separate from _detection_settings() on purpose: that one also
+        carries bookkeeping like the labelling mode, and it is splatted into
+        predict() by the worker. Adding a key there once shipped a crash
+        ("unexpected keyword argument 'labelling'"), so the boundary is now
+        explicit.
+        """
         return {
-            "labelling": self.label_mode(),
             "conf": self.spin_conf.value(),
             "tiling": self.check_tiling.isChecked(),
             "tile_size": self.spin_tile.value(),
             "tile_overlap": self.spin_overlap.value(),
         }
+
+    def _detection_settings(self):
+        """What produced a result, for the record: predict args plus context."""
+        return dict(self._predict_kwargs(), labelling=self.label_mode())
 
     def annotate_current(self):
         if not self._ready_to_annotate():
@@ -1330,7 +1341,7 @@ class MainWindow(QMainWindow):
         self.button_cancel.setVisible(True)
 
         self.infer_worker = InferenceWorker(
-            self.detector, paths, self._detection_settings(), self
+            self.detector, paths, self._predict_kwargs(), self
         )
         self.infer_worker.image_started.connect(self._on_image_started)
         self.infer_worker.tile_progress.connect(self._on_tile_progress)
@@ -1678,6 +1689,12 @@ class MainWindow(QMainWindow):
             self.spin_tile.setValue(int(settings["tile_size"]))
         if "tile_overlap" in settings:
             self.spin_overlap.setValue(float(settings["tile_overlap"]))
+        if settings.get("labelling"):
+            index = self.combo_labelling.findData(settings["labelling"])
+            if index >= 0:
+                self.combo_labelling.blockSignals(True)
+                self.combo_labelling.setCurrentIndex(index)
+                self.combo_labelling.blockSignals(False)
         options = data["export_options"]
         self.check_csv.setChecked(bool(options.get("csv", True)))
         self.check_yolo.setChecked(bool(options.get("yolo", False)))
