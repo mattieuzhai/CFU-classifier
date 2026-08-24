@@ -9,7 +9,8 @@ No programming needed — everything is buttons and menus.
 ![](docs/cfu_annotator.png)
 
 Work is saved as a **project** you can reopen later, and every image carries a
-status — annotated, edited by hand, or finalized — shown in the image list.
+status — annotated, edited by hand, finalized or contaminated — shown in the
+image list. ⌘Z undoes your last change.
 
 ---
 
@@ -65,6 +66,21 @@ A normal Finder dialog opens, so you can navigate to the folder as usual.
   those to JPEG or PNG if you need them counted.
 - Only the folder itself is read — images in subfolders are **not** picked up.
 
+#### Pre-loading annotations you already have
+
+**Choose labels folder… (optional)** reads YOLO `.txt` files back in, so a plate
+you annotated earlier — in this app, in labelImg, or from a batch run on the
+cluster — comes up already annotated instead of blank.
+
+Labels are matched to images by filename: `plate1.jpg` needs `plate1.txt`.
+Everything else in the folder is ignored, including `classes.txt` and labels with
+no matching image. Malformed lines are skipped and counted rather than failing
+the import, and you get a summary of what loaded. Imported plates show as
+**annotated**, with the source folder recorded in the export log; an empty label
+file counts as "annotated, no colonies". Boxes are stored in pixel coordinates
+from each image's real dimensions, so they line up exactly and re-export
+unchanged.
+
 The first image appears as soon as the folder loads, and **every** image in the
 folder is listed in the panel below the setup steps. Click any row to jump
 straight to that image — no need to arrow through them one at a time. Each row
@@ -76,6 +92,7 @@ carries an icon showing where that image stands:
 | ✓ green tick | Annotated | the model, automatically |
 | ✏️ pencil | Annotated and edited by hand | you, on any change to a box |
 | 🔒 blue padlock | Finalized | you, when you're happy with the image |
+| ⛔ red sign | Contaminated | you, when the plate is unusable |
 
 "Edited" appears as soon as you draw, move, resize, delete, or relabel a box.
 Re-running the model on an image resets it to plain "annotated", since the boxes
@@ -87,6 +104,16 @@ meaningful the app then protects them — the boxes can't be drawn, moved,
 deleted, or relabelled, and neither *Annotate image* nor *Annotate all
 remaining* will overwrite them. A badge on the image says so. Click the same
 button (now reading **Finalized — click to unlock**) to make changes again.
+
+**Contaminated** writes a plate off completely. It asks first, then discards
+every count on that plate and locks it the same way finalizing does — the model
+won't touch it either. The count summary lists it as `contaminated` with zeros,
+so a contaminated plate is never confused with one that genuinely grew nothing,
+and it is left out of the YOLO labels and annotated images (a discarded plate
+shouldn't become training data). It is undoable, and the button reads
+**Contaminated — click to undo** afterwards; note that undoing past the point
+where the counts were discarded is the only way to get them back without
+re-running the model.
 
 ### 2. Choose the model
 
@@ -114,20 +141,24 @@ Click **Choose output folder…**, then tick what you want written:
 | *(always)* | `export_info.txt` | — |
 
 Nothing is written loose into the folder you chose. Each export creates its own
-dated folder inside it:
+folder inside it. Type a name in the **Folder** box — `March 2026 counts`,
+`rep2 recount`, whatever suits — or leave it blank for a dated default:
 
 ```
 counts_out/                          ← the folder you chose
-├── CFU_export_2026-08-07_1642/      ← one export
+├── March 2026 counts/               ← a name you typed
 │   ├── CFU_counts.csv
 │   ├── export_info.txt
 │   ├── yolo_labels/
 │   └── annotated_images/
-└── CFU_export_2026-08-07_1710/      ← a later export, untouched by the first
+├── March 2026 counts-2/            ← same name again: kept, not overwritten
+└── CFU_export_2026-08-24_1710/      ← left the name blank
 ```
 
-Re-exporting therefore never overwrites numbers you have already used, and two
-exports in the same minute get a `-2` suffix rather than colliding.
+Re-exporting therefore never overwrites numbers you have already used: a name
+that is already taken gains a `-2` suffix rather than replacing what is there.
+Characters that break on other platforms (`/ : * ? " < > |`) are turned into
+dashes, so a name typed here still opens on a Windows share.
 
 **Annotated images** are full-resolution copies of each annotated plate with the
 boxes and labels drawn on (`plate1.jpg` → `plate1_annotated.jpg`), for checking
@@ -237,6 +268,8 @@ labelImg/CVAT:
 | Next / previous image | `D` / `A`, the buttons under the image, or click a row in the image list |
 | Jump to any image | Click its row in the image list |
 | Mark an image complete | **Mark as finalized**, or ⌘L |
+| Write a plate off | **Mark as contaminated**, or ⇧⌘X |
+| Undo the last change | ⌘Z (Ctrl+Z on Windows) |
 
 After you draw a box the tool returns to **Select / Edit** on its own, so the
 next click edits rather than drawing another box by accident. If you're adding
@@ -248,6 +281,12 @@ and edits stick when you move between images. The class highlighted in the
 right-hand list is the one new boxes get; relabelling an existing box is always
 explicit, so choosing what to draw next can't silently change a box you already
 have selected.
+
+**⌘Z undoes the last thing you did** — drawing, moving, resizing, relabelling or
+deleting a box, finalizing a plate, marking one contaminated, and re-running the
+model on an image. The history holds the last 100 actions and spans images: if
+your last edit was two plates ago, undo jumps back to that plate and shows you
+the change being reversed. There is deliberately no redo.
 
 ---
 
@@ -407,6 +446,7 @@ The build is driven by `CFU_Annotator.spec`. Two things in it matter:
 | `status.py` | The four per-image statuses and their drawn icons |
 | `render.py` | Drawing boxes onto exported image copies |
 | `settings.py` | Remembering the last-used setup (QSettings) |
+| `labels.py` | Reading existing YOLO label files back in |
 | `../tests/test_canvas_geometry.py` | Regression tests for the canvas geometry contract (in `annotator/tests/`) |
 
 Run every check with:
@@ -436,6 +476,7 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.3.0 | Export folders can be named; plates can be marked contaminated; ⌘Z undo; existing YOLO labels can be pre-loaded |
 | 1.2.0 | Exports go into their own dated folder; annotated images can be exported; the draw tool returns to Select after each box; settings are remembered between launches |
 | 1.1.1 | Fixed a crash when zooming with the scroll wheel on an annotated image |
 | 1.1.0 | Projects, image list with per-image status, export log, bundled `.app` |

@@ -162,7 +162,8 @@ class ImageCanvas(QGraphicsView):
         self.active_class = 0
         self.show_labels = True
         self.show_confidence = False
-        self.locked = False        # set for images the user marked as finalized
+        self.locked = False        # set for finalized or contaminated images
+        self.locked_reason = None   # "finalized" | "contaminated" | None
         # Drawing is one-shot by default: after a box is drawn the canvas drops
         # back to select mode, so the very next click edits instead of drawing
         # another box by accident. Tick "Keep drawing" to add several in a row.
@@ -412,6 +413,11 @@ class ImageCanvas(QGraphicsView):
     def set_active_class(self, cls_id):
         self.active_class = cls_id
 
+    def set_locked_reason(self, reason):
+        """Which badge to show while locked."""
+        self.locked_reason = reason
+        self.viewport().update()
+
     def set_locked(self, locked):
         self.locked = bool(locked)
         if self.locked:
@@ -541,7 +547,10 @@ class ImageCanvas(QGraphicsView):
             painter.drawRect(handle)
 
     def _draw_locked_badge(self, painter, metrics):
-        text = "FINALIZED — locked"
+        if self.locked_reason == "contaminated":
+            text, colour = "CONTAMINATED — no counts", QColor(179, 38, 30, 230)
+        else:
+            text, colour = "FINALIZED — locked", QColor(31, 79, 216, 225)
         pad = 8
         box = QRectF(
             10, 10,
@@ -549,7 +558,7 @@ class ImageCanvas(QGraphicsView):
             metrics.height() + 2 * pad,
         )
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(31, 79, 216, 225))
+        painter.setBrush(colour)
         painter.drawRoundedRect(box, 5, 5)
         painter.setPen(QPen(QColor("#ffffff")))
         painter.drawText(box, Qt.AlignCenter, text)

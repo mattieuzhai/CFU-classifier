@@ -4,6 +4,7 @@
     annotated      the model produced boxes, untouched since
     edited         boxes were drawn, moved, resized, relabelled or deleted by hand
     finalized      the user declared the annotations complete (and locked them)
+    contaminated   the plate is unusable; its counts are discarded and locked
 
 Icons are drawn with QPainter rather than shipped as image files, so they stay
 crisp on Retina displays and there are no assets to lose in a bundled app.
@@ -16,14 +17,19 @@ NOT_ANNOTATED = "not_annotated"
 ANNOTATED = "annotated"
 EDITED = "edited"
 FINALIZED = "finalized"
+CONTAMINATED = "contaminated"
 
-ORDER = [NOT_ANNOTATED, ANNOTATED, EDITED, FINALIZED]
+ORDER = [NOT_ANNOTATED, ANNOTATED, EDITED, FINALIZED, CONTAMINATED]
+
+#: Statuses whose annotations are protected from further editing.
+LOCKED = (FINALIZED, CONTAMINATED)
 
 LABELS = {
     NOT_ANNOTATED: "Not annotated",
     ANNOTATED: "Annotated by the model",
     EDITED: "Annotated and edited by hand",
     FINALIZED: "Finalized (locked)",
+    CONTAMINATED: "Contaminated — no counts (locked)",
 }
 
 SHORT_LABELS = {
@@ -31,6 +37,7 @@ SHORT_LABELS = {
     ANNOTATED: "Annotated",
     EDITED: "Edited by hand",
     FINALIZED: "Finalized",
+    CONTAMINATED: "Contaminated",
 }
 
 COLORS = {
@@ -38,13 +45,23 @@ COLORS = {
     ANNOTATED: "#1a7f37",
     EDITED: "#c26a00",
     FINALIZED: "#1f4fd8",
+    CONTAMINATED: "#b3261e",
 }
+
+
+def is_locked(record):
+    """True when a record's annotations must not be edited."""
+    return status_of(record) in LOCKED
 
 
 def status_of(record):
     """Derive the status of one image from its record."""
     if not record:
         return NOT_ANNOTATED
+    # Contamination is terminal: it outranks everything else, including a plate
+    # that was finalized before the contamination was spotted.
+    if record.get("contaminated"):
+        return CONTAMINATED
     if record.get("finalized"):
         return FINALIZED
     if record.get("edited"):
@@ -155,11 +172,29 @@ def _draw_finalized(painter, size):
     ))
 
 
+def _draw_contaminated(painter, size):
+    """A red 'excluded' sign — unmistakably different from the padlock."""
+    color = QColor(COLORS[CONTAMINATED])
+    painter.setPen(Qt.NoPen)
+    painter.setBrush(color)
+    disc = QRectF(size * 0.12, size * 0.12, size * 0.76, size * 0.76)
+    painter.drawEllipse(disc)
+
+    pen = _pen("#ffffff", 0.15, size)
+    pen.setCapStyle(Qt.FlatCap)
+    painter.setPen(pen)
+    inset = size * 0.24
+    painter.drawLine(
+        QPointF(inset, size - inset), QPointF(size - inset, inset)
+    )
+
+
 _PAINTERS = {
     NOT_ANNOTATED: _draw_not_annotated,
     ANNOTATED: _draw_annotated,
     EDITED: _draw_edited,
     FINALIZED: _draw_finalized,
+    CONTAMINATED: _draw_contaminated,
 }
 
 

@@ -1,5 +1,6 @@
 """The main window: folder/model/output pickers, the canvas, and export."""
 
+import sys
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QSize, QUrl
@@ -18,6 +19,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -35,11 +37,13 @@ from PyQt5.QtWidgets import (
 )
 
 from . import (
-    APP_NAME, __version__, detector as det, export, project, render, scan,
-    settings as prefs, status,
+    APP_NAME, __version__, detector as det, export, labels as labels_io,
+    project, render, scan, settings as prefs, status,
 )
 from .canvas import MODE_DRAW, MODE_SELECT, ImageCanvas, class_color
 from .workers import ImageExportWorker, InferenceWorker, ModelLoadWorker
+
+UNDO_DEPTH = 100       # plenty for a session's worth of hand corrections
 
 HINT = "color: #666;"
 OK = "color: #1a7f37; font-weight: bold;"
@@ -68,6 +72,7 @@ class MainWindow(QMainWindow):
         # -- state ---------------------------------------------------------
         self.image_folder = None
         self.output_folder = None
+        self.labels_folder = None
         self.images = []               # list[Path]
         self.index = -1
         self.detector = None
@@ -83,6 +88,8 @@ class MainWindow(QMainWindow):
         # Held until the restored model finishes loading, so the summary of what
         # was restored isn't immediately overwritten by "Model ready".
         self._restore_note = None
+        self._undo_stack = []
+        self._pre_edit = None
 
         self._build_ui()
         self._restore_settings()
@@ -115,8 +122,8 @@ class MainWindow(QMainWindow):
         splitter.setSizes([350, 830, 310])
         self.setCentralWidget(splitter)
 
-        self._build_menus()
         self._build_toolbar()
+        self._build_menus()
 
         self.status_label = QLabel("Choose an image folder and a model to begin.")
         self.coord_label = QLabel("")
@@ -157,6 +164,16 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction("Quit", self.close, QKeySequence.Quit)
 
+        edit_menu = bar.addMenu("&Edit")
+        self.action_undo = edit_menu.addAction("Undo", self.undo, QKeySequence.Undo)
+        self.action_undo.setEnabled(False)
+        edit_menu.addSeparator()
+        # The same QAction the toolbar uses — one object, one Delete shortcut.
+        edit_menu.addAction(self.action_delete)
+        self.action_clear = edit_menu.addAction(
+            "Clear all boxes on this image", self.clear_current
+        )
+
         image_menu = bar.addMenu("&Image")
         image_menu.addAction("Previous image", lambda: self._go_to(self.index - 1),
                              QKeySequence("A"))
@@ -167,6 +184,11 @@ class MainWindow(QMainWindow):
             "Mark as finalized", self.toggle_finalized, QKeySequence("Ctrl+L")
         )
         self.action_finalize.setCheckable(True)
+        self.action_contaminated = image_menu.addAction(
+            "Mark as contaminated", self.toggle_contaminated,
+            QKeySequence("Ctrl+Shift+X"),
+        )
+        self.action_contaminated.setCheckable(True)
         image_menu.addSeparator()
         image_menu.addAction("Annotate this image", self.annotate_current,
                              QKeySequence("R"))
@@ -198,6 +220,16 @@ class MainWindow(QMainWindow):
         )
         self.button_finalize.clicked.connect(self.toggle_finalized)
         layout.addWidget(self.button_finalize)
+
+        self.button_contaminated = QPushButton("Mark as contaminated")
+        self.button_contaminated.setCheckable(True)
+        self.button_contaminated.setToolTip(
+            "Write this plate off: its counts are discarded and the plate is "
+            "locked, and the summary reports it as contaminated with zero "
+            "colonies. Undoable."
+        )
+        self.button_contaminated.clicked.connect(self.toggle_contaminated)
+        layout.addWidget(self.button_contaminated)
 
         legend = QWidget()
         grid = QGridLayout(legend)
@@ -408,8 +440,21 @@ class MainWindow(QMainWindow):
         self.label_images = QLabel("No folder chosen")
         self.label_images.setWordWrap(True)
         self.label_images.setStyleSheet(HINT)
+        self.button_labels = QPushButton("Choose labels folder… (optional)")
+        self.button_labels.setToolTip(
+            "Pre-load annotations you already have: a folder of YOLO .txt "
+            "files named after the images (plate1.jpg -> plate1.txt). "
+            "Anything that isn't a matching label file is ignored."
+        )
+        self.button_labels.clicked.connect(self.choose_labels_folder)
+        self.label_labels = QLabel("No labels loaded")
+        self.label_labels.setWordWrap(True)
+        self.label_labels.setStyleSheet(HINT)
+
         layout.addWidget(button)
         layout.addWidget(self.label_images)
+        layout.addWidget(self.button_labels)
+        layout.addWidget(self.label_labels)
         return group
 
     def _group_model(self):
@@ -452,13 +497,17 @@ class MainWindow(QMainWindow):
             f"the slowest and largest part of an export; untick it to skip."
         )
 
-        note = QLabel(f"Each export gets its own {export.EXPORT_PREFIX}_… folder.")
-        note.setWordWrap(True)
-        note.setStyleSheet(HINT)
-        note.setToolTip(
-            "Exports are never written loose into the folder you chose, and a "
-            "re-export never overwrites earlier results."
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Folder"))
+        self.edit_export_name = QLineEdit()
+        self.edit_export_name.setPlaceholderText(export.export_dir_name())
+        self.edit_export_name.setToolTip(
+            "Name for the folder this export creates. Leave it blank to get a "
+            "dated name like " + export.export_dir_name() + ". If the name is "
+            "already taken, -2 is appended rather than overwriting it."
         )
+        name_row.addWidget(self.edit_export_name, 1)
+
 
         self.button_export = QPushButton("Export now")
         self.button_export.setToolTip("Write the selected outputs (Ctrl/Cmd+E)")
@@ -469,7 +518,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.check_csv)
         layout.addWidget(self.check_yolo)
         layout.addWidget(self.check_images)
-        layout.addWidget(note)
+        layout.addLayout(name_row)
         layout.addWidget(self.button_export)
         return group
 
@@ -530,9 +579,6 @@ class MainWindow(QMainWindow):
         tile_row.addWidget(self.spin_overlap, 1)
         layout.addLayout(tile_row)
 
-        self.button_clear = QPushButton("Clear boxes on this image")
-        self.button_clear.clicked.connect(self.clear_current)
-        layout.addWidget(self.button_clear)
 
         self.progress = QProgressBar()
         self.progress.setVisible(False)
@@ -642,6 +688,11 @@ class MainWindow(QMainWindow):
         if not keep_records:
             self.records = {}
             self.image_sizes = {}
+            self.labels_folder = None
+            self.label_labels.setText("No labels loaded")
+            self.label_labels.setStyleSheet(HINT)
+        self._undo_stack = []
+        self._refresh_undo_action()
         self.index = -1
 
         note = f"<b>{self.image_folder.name}</b><br>{len(self.images)} image(s)"
@@ -655,6 +706,106 @@ class MainWindow(QMainWindow):
         self._go_to(0)
         self._update_enabled_state()
         self._show_status(f"Loaded {len(self.images)} image(s) from {self.image_folder}")
+        return True
+
+    def choose_labels_folder(self):
+        """Pre-load annotations from a folder of YOLO .txt files."""
+        if not self.images:
+            QMessageBox.information(
+                self, "No images yet",
+                "Choose the image folder first — labels are matched to images "
+                "by filename.",
+            )
+            return
+        folder = QFileDialog.getExistingDirectory(
+            self, "Choose the folder containing YOLO label files (.txt)",
+            str(self.labels_folder or self.image_folder or Path.home()),
+        )
+        if not folder:
+            return
+        self._import_labels(Path(folder))
+
+    def _import_labels(self, folder, quiet=False):
+        """Load YOLO labels for the current images. Returns True if any loaded."""
+        already = [p.name for p in self.images
+                   if (self.records.get(p.name) or {}).get("boxes")]
+        if already and not quiet:
+            answer = QMessageBox.question(
+                self, "Replace existing annotations?",
+                f"{len(already)} image(s) already have boxes.\n\nImporting "
+                f"labels replaces the boxes on every image that has a matching "
+                f"label file. Images without one are left alone.",
+                QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel,
+            )
+            if answer != QMessageBox.Yes:
+                return False
+
+        try:
+            report = labels_io.import_folder(
+                folder, self.images,
+                class_count=len(self.canvas.class_names) or None,
+                known_sizes=self.image_sizes,
+            )
+        except OSError as exc:
+            if not quiet:
+                QMessageBox.critical(self, "Cannot read labels folder", str(exc))
+            return False
+
+        if not report.images_with_labels:
+            self.labels_folder = None
+            self.label_labels.setText("No labels loaded")
+            self.label_labels.setStyleSheet(HINT)
+            if not quiet:
+                QMessageBox.warning(
+                    self, "No matching label files",
+                    f"Nothing in\n\n{folder}\n\nmatched the images in this "
+                    f"folder.\n\nLabel files must be .txt named after the "
+                    f"image — plate1.jpg needs plate1.txt.\n\n"
+                    f"{report.summary()}",
+                )
+            return False
+
+        for name, boxes in report.loaded.items():
+            record = self._record(name, create=True)
+            if record.get("contaminated"):
+                continue          # a written-off plate keeps no counts
+            record["boxes"] = boxes
+            record["annotated"] = True
+            record["edited"] = False
+            record["model"] = f"imported from {Path(folder).name}"
+            record["params"] = None
+            self.image_sizes.setdefault(
+                name, labels_io.image_size(self.image_folder / name)
+            )
+
+        self.labels_folder = Path(folder)
+        self.label_labels.setText(
+            f"<b>{self.labels_folder.name}</b><br>"
+            f"{report.boxes} box(es) on {report.images_with_labels} image(s)"
+        )
+        self.label_labels.setStyleSheet("")
+
+        # Show the freshly imported boxes on whatever is on screen. Deliberately
+        # not _go_to(): that stores the canvas into the record first, which
+        # would overwrite what we just imported for the current image.
+        if self.index >= 0:
+            current = self.records.get(self.images[self.index].name)
+            self.canvas.set_locked(False)
+            self.canvas.set_boxes(list((current or {}).get("boxes") or []))
+            self._apply_locked_state()
+            self._refresh_position_label()
+            self._refresh_pre_edit()
+        self._rebuild_image_list()
+        self._mark_dirty()
+        self._save_settings()
+        self._refresh_counts()
+        self._show_status(report.summary(self.canvas.class_names).replace("\n\n", " "))
+        if not quiet and (report.bad_lines or report.out_of_range_classes
+                          or report.unreadable):
+            QMessageBox.warning(
+                self, "Labels imported with warnings",
+                report.summary(self.canvas.class_names),
+            )
         return True
 
     def choose_model(self):
@@ -782,6 +933,7 @@ class MainWindow(QMainWindow):
         self._refresh_position_label()
         self._refresh_counts()
         self._update_enabled_state()
+        self._refresh_pre_edit()
         self.zoom_label.setText(f"{self.canvas.zoom_percent():.0f}%")
 
     def _store_current(self):
@@ -794,7 +946,8 @@ class MainWindow(QMainWindow):
         if record is None:
             if not boxes:
                 return
-            record = {"annotated": False, "edited": False, "finalized": False}
+            record = {"annotated": False, "edited": False, "finalized": False,
+                      "contaminated": False}
             self.records[name] = record
         record["boxes"] = boxes
 
@@ -802,7 +955,8 @@ class MainWindow(QMainWindow):
         record = self.records.get(name)
         if record is None and create:
             record = {
-                "boxes": [], "annotated": False, "edited": False, "finalized": False,
+                "boxes": [], "annotated": False, "edited": False,
+                "finalized": False, "contaminated": False,
             }
             self.records[name] = record
         return record
@@ -865,6 +1019,13 @@ class MainWindow(QMainWindow):
             return
         name = self.images[self.index].name
         record = self._record(name, create=True)
+        if record.get("contaminated"):
+            self._show_status(
+                f"'{name}' is marked contaminated — undo that before finalizing it."
+            )
+            self._apply_locked_state()
+            return
+        self._push_undo(name)
         record["finalized"] = not record.get("finalized")
         self._apply_locked_state()
         self._mark_dirty()
@@ -879,22 +1040,174 @@ class MainWindow(QMainWindow):
             else f"'{name}' unlocked and can be edited again."
         )
 
+    def toggle_contaminated(self):
+        """Write a plate off entirely: its counts go, and it locks.
+
+        Destructive, so it asks first — and the wipe is undoable, because
+        losing an hour of hand-corrections to a misclick would be unforgivable.
+        """
+        if self.index < 0:
+            return
+        name = self.images[self.index].name
+        record = self._record(name, create=True)
+
+        if record.get("contaminated"):
+            self._push_undo(name)
+            record["contaminated"] = False
+            message = (
+                f"'{name}' is no longer marked contaminated. Its counts were "
+                f"discarded, so re-run the model if you need them back."
+            )
+        else:
+            existing = len(record.get("boxes") or []) or len(self.canvas.get_boxes())
+            if existing:
+                answer = QMessageBox.question(
+                    self, "Mark as contaminated?",
+                    f"'{name}' currently has {existing} box(es).\n\n"
+                    f"Marking it contaminated discards those counts and locks "
+                    f"the plate. The count summary will show it as "
+                    f"contaminated with zero colonies.\n\n"
+                    f"You can undo this with {'⌘' if sys.platform == 'darwin' else 'Ctrl+'}Z.",
+                    QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel,
+                )
+                if answer != QMessageBox.Yes:
+                    self._apply_locked_state()
+                    return
+            self._push_undo(name)
+            record["contaminated"] = True
+            record["finalized"] = False       # contamination supersedes it
+            record["boxes"] = []
+            record["annotated"] = False
+            record["edited"] = False
+            self.canvas.set_locked(False)     # allow the programmatic clear
+            self.canvas.set_boxes([])
+            message = (
+                f"'{name}' marked contaminated — its counts were discarded and "
+                f"the plate is locked."
+            )
+
+        self._apply_locked_state()
+        self._mark_dirty()
+        self._refresh_image_row()
+        self._refresh_position_label()
+        self._refresh_counts()
+        self._update_enabled_state()
+        self._show_status(message)
+
+    # ------------------------------------------------------------------ undo
+
+    def _snapshot(self, name):
+        """Everything about one image that an edit could change."""
+        record = self.records.get(name)
+        boxes = (self.canvas.get_boxes()
+                 if self.index >= 0 and self.images[self.index].name == name
+                 else list((record or {}).get("boxes") or []))
+        return {
+            "name": name,
+            "boxes": [dict(b) for b in boxes],
+            "flags": {
+                key: bool((record or {}).get(key))
+                for key in ("annotated", "edited", "finalized", "contaminated")
+            },
+        }
+
+    def _refresh_pre_edit(self):
+        """Remember the current image's state, ready to be pushed on the next edit."""
+        self._pre_edit = (
+            self._snapshot(self.images[self.index].name) if self.index >= 0 else None
+        )
+
+    def _push_undo(self, name=None):
+        """Record the state of `name` before it is about to change."""
+        if name is None:
+            if self.index < 0:
+                return
+            name = self.images[self.index].name
+        self._undo_stack.append(self._snapshot(name))
+        del self._undo_stack[:-UNDO_DEPTH]
+        self._refresh_undo_action()
+
+    def _refresh_undo_action(self):
+        depth = len(self._undo_stack)
+        self.action_undo.setEnabled(depth > 0)
+        self.action_undo.setText("Undo" if not depth else f"Undo ({depth})")
+
+    def undo(self):
+        """Step back one edit. There is deliberately no redo."""
+        if not self._undo_stack:
+            self._show_status("Nothing to undo")
+            return
+        state = self._undo_stack.pop()
+        name = state["name"]
+
+        row = next((i for i, p in enumerate(self.images) if p.name == name), None)
+        if row is None:                       # its folder changed under us
+            self._show_status(f"Cannot undo — '{name}' is no longer in the folder.")
+            self._refresh_undo_action()
+            return
+        if row != self.index:
+            # Jump to the image the edit belongs to, so the user sees it happen.
+            self._go_to(row)
+
+        record = self._record(name, create=True)
+        record["boxes"] = [dict(b) for b in state["boxes"]]
+        record.update(state["flags"])
+
+        self.canvas.set_locked(False)         # restore first, re-lock after
+        self.canvas.set_boxes(record["boxes"])
+        self._apply_locked_state()
+        self._mark_dirty()
+        self._refresh_image_row()
+        self._refresh_position_label()
+        self._refresh_counts()
+        self._update_enabled_state()
+        self._refresh_pre_edit()
+        self._refresh_undo_action()
+        self._show_status(
+            f"Undone — '{name}' restored to "
+            f"{len(record['boxes'])} box(es) ({status.LABELS[self._status_of(name)]})"
+        )
+
     def _apply_locked_state(self):
-        """Push the current image's finalized flag into the canvas and buttons."""
-        locked = False
+        """Push the current image's finalized/contaminated state into the UI."""
+        record = None
         if self.index >= 0:
             record = self.records.get(self.images[self.index].name)
-            locked = bool(record and record.get("finalized"))
-        self.canvas.set_locked(locked)
-        for widget in (self.button_finalize, self.action_finalize):
+        finalized = bool(record and record.get("finalized"))
+        contaminated = bool(record and record.get("contaminated"))
+        self.canvas.set_locked(status.is_locked(record))
+        self.canvas.set_locked_reason(
+            status.CONTAMINATED if contaminated
+            else (status.FINALIZED if finalized else None)
+        )
+
+        for widget, checked in (
+            (self.button_finalize, finalized), (self.action_finalize, finalized),
+            (self.button_contaminated, contaminated),
+            (self.action_contaminated, contaminated),
+        ):
             widget.blockSignals(True)
-            widget.setChecked(locked)
+            widget.setChecked(checked)
             widget.blockSignals(False)
-        self.button_finalize.setText("Finalized — click to unlock" if locked
+        self.button_finalize.setText("Finalized — click to unlock" if finalized
                                      else "Mark as finalized")
+        self.button_contaminated.setText(
+            "Contaminated — click to undo" if contaminated
+            else "Mark as contaminated"
+        )
+        # Finalizing a plate you have already written off is meaningless.
+        self.button_finalize.setEnabled(bool(self.images) and not contaminated)
+        self.action_finalize.setEnabled(bool(self.images) and not contaminated)
 
     def _on_edit_blocked(self):
+        contaminated = False
+        if self.index >= 0:
+            record = self.records.get(self.images[self.index].name)
+            contaminated = bool(record and record.get("contaminated"))
         self._show_status(
+            "This plate is marked contaminated, so it holds no counts and "
+            "cannot be edited. Click 'Contaminated — click to undo' to reopen it."
+            if contaminated else
             "This image is finalized, so its annotations are locked. "
             "Click 'Finalized — click to unlock' to make changes."
         )
@@ -916,9 +1229,9 @@ class MainWindow(QMainWindow):
         if self.canvas.locked:
             QMessageBox.information(
                 self, "Image is finalized",
-                f"'{path.name}' is marked as finalized, so the model won't "
-                "overwrite it.\n\nUnlock it first if you want to re-run "
-                "detection on it.",
+                f"'{path.name}' is locked ({status.LABELS[self._status_of(path.name)]}), "
+                "so the model won't overwrite it.\n\nUnlock it first if you want "
+                "to re-run detection on it.",
             )
             return
         if self.canvas.get_boxes():
@@ -938,7 +1251,7 @@ class MainWindow(QMainWindow):
         pending, skipped_final = [], 0
         for path in self.images:
             record = self.records.get(path.name) or {}
-            if record.get("finalized"):
+            if status.is_locked(record):
                 skipped_final += 1        # never touch what the user locked
             elif not record.get("annotated"):
                 pending.append(path)
@@ -1005,6 +1318,7 @@ class MainWindow(QMainWindow):
         )
 
     def _on_image_done(self, name, detections):
+        self._push_undo(name)     # re-running the model is undoable
         # A fresh model run resets the 'edited by hand' flag: the boxes on screen
         # are the model's again. Settings used are kept per image so the export
         # log can report what actually produced each result.
@@ -1025,6 +1339,7 @@ class MainWindow(QMainWindow):
             self._refresh_image_row(row)
         self._refresh_position_label()
         self._refresh_counts()
+        self._refresh_pre_edit()
         self._show_status(f"{name}: found {len(detections)} colony/colonies")
 
     def _on_image_failed(self, name, message):
@@ -1076,6 +1391,8 @@ class MainWindow(QMainWindow):
             "image_folder": str(self.image_folder) if self.image_folder else None,
             "model_path": str(self.detector.path) if self.detector else None,
             "output_folder": str(self.output_folder) if self.output_folder else None,
+            "labels_folder": str(self.labels_folder) if self.labels_folder else None,
+            "export_name": self.edit_export_name.text() or None,
             "conf": self.spin_conf.value(),
             "tiling": self.check_tiling.isChecked(),
             "tile_size": self.spin_tile.value(),
@@ -1114,6 +1431,7 @@ class MainWindow(QMainWindow):
         self.check_labels.setChecked(prefs.get_bool(values, "show_labels", True))
         self.check_conf.setChecked(prefs.get_bool(values, "show_confidence", False))
         self.check_sticky.setChecked(prefs.get_bool(values, "sticky_draw", False))
+        self.edit_export_name.setText(prefs.get_str(values, "export_name", "") or "")
 
         restored, missing = [], []
 
@@ -1134,6 +1452,13 @@ class MainWindow(QMainWindow):
                 restored.append(f"{len(self.images)} image(s)")
         elif folder:
             missing.append("image folder")
+
+        label_dir = prefs.get_str(values, "labels_folder")
+        if label_dir and Path(label_dir).is_dir() and self.images:
+            if self._import_labels(Path(label_dir), quiet=True):
+                restored.append("labels")
+        elif label_dir:
+            missing.append("labels folder")
 
         model = prefs.get_str(values, "model_path")
         if model and Path(model).is_file():
@@ -1196,9 +1521,15 @@ class MainWindow(QMainWindow):
         self.image_sizes = {}
         self.project_path = None
         self.dirty = False
+        self.labels_folder = None
+        self._undo_stack = []
+        self._pre_edit = None
+        self._refresh_undo_action()
 
         self.canvas.clear_image()
         self.list_images.clear()
+        self.label_labels.setText("No labels loaded")
+        self.label_labels.setStyleSheet(HINT)
         self.label_images.setText("No folder chosen")
         self.label_images.setStyleSheet(HINT)
         self.label_output.setText("No folder chosen")
@@ -1259,6 +1590,9 @@ class MainWindow(QMainWindow):
 
         self.records = data["records"]
         self.image_sizes = data["image_sizes"]
+        self._undo_stack = []
+        self._pre_edit = None
+        self._refresh_undo_action()
         self.project_path = Path(path)
         self.index = -1
         self.images = []
@@ -1363,7 +1697,9 @@ class MainWindow(QMainWindow):
             self._ensure_image_sizes()
 
         try:
-            folder = export.make_export_dir(self.output_folder)
+            folder = export.make_export_dir(
+                self.output_folder, self.edit_export_name.text()
+            )
         except OSError as exc:
             QMessageBox.critical(
                 self, "Export failed",
@@ -1420,6 +1756,8 @@ class MainWindow(QMainWindow):
             record = self.records.get(path.name)
             if not record or not record.get("annotated"):
                 continue
+            if record.get("contaminated"):
+                continue          # nothing to draw on a discarded plate
             jobs.append((path, target / render.output_name(path.name), record["boxes"]))
 
         if not jobs:
@@ -1625,6 +1963,12 @@ class MainWindow(QMainWindow):
         if self.index < 0:
             return
         name = self.images[self.index].name
+        # boxes_changed has already stored the new state, so the undo entry has
+        # to come from the snapshot taken when this image last settled.
+        if self._pre_edit and self._pre_edit["name"] == name:
+            self._undo_stack.append(self._pre_edit)
+            del self._undo_stack[:-UNDO_DEPTH]
+            self._refresh_undo_action()
         record = self._record(name, create=True)
         record["edited"] = True
         self._mark_dirty()
@@ -1678,7 +2022,7 @@ class MainWindow(QMainWindow):
     def _set_busy(self, busy, message=None):
         self._busy = busy
         for widget in (
-            self.button_annotate, self.button_annotate_all, self.button_clear,
+            self.button_annotate, self.button_annotate_all, self.action_clear,
             self.button_prev, self.button_next, self.button_export,
         ):
             widget.setEnabled(not busy)
@@ -1698,14 +2042,15 @@ class MainWindow(QMainWindow):
         self.button_annotate.setEnabled(has_images and has_model)
         self.button_annotate_all.setEnabled(has_images and has_model)
         locked = self.canvas.locked
-        self.button_clear.setEnabled(
+        self.action_clear.setEnabled(
             has_images and bool(self.canvas.get_boxes()) and not locked
         )
         self.button_export.setEnabled(bool(self.output_folder) and has_images)
         self.action_draw.setEnabled(has_images and not locked)
         self.action_delete.setEnabled(self.canvas.selected_count() > 0 and not locked)
-        self.button_finalize.setEnabled(has_images)
-        self.action_finalize.setEnabled(has_images)
+        self.button_contaminated.setEnabled(has_images)
+        self.action_contaminated.setEnabled(has_images)
+        self.button_labels.setEnabled(has_images)
         self.button_apply_class.setEnabled(
             self.canvas.selected_count() > 0 and not locked
         )
