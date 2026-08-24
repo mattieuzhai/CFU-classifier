@@ -129,6 +129,28 @@ Only **detection** models are supported, since counting needs a box per colony.
 Pick a classification, segmentation, pose, or rotated-box (OBB) model and the
 app says so and declines to load it.
 
+#### Using your own classes instead of the model's
+
+The class list normally comes from the model. **Load list…** under the Classes
+panel replaces it with your own: a `.txt` file with one class name per line —
+exactly the `classes.txt` labelImg writes, and exactly what this app exports
+into `yolo_labels/`. **Add…** appends a single class without editing a file.
+
+Your list then drives everything: the number keys, the counts table, the CSV
+columns and the exported `classes.txt`. A model loaded afterwards keeps its
+boxes but **not** its vocabulary — in detect-only work the model supplies
+geometry and you supply the labels, so it would be wrong to rename your classes
+underneath you.
+
+This also means the app works with **no model at all**: load a class list, draw
+boxes by hand (`W`), and label them. At that point it is a plain annotation tool
+in the labelImg mould, with the project file, the statuses and the export
+folders on top. Pair it with **Choose labels folder…** to open, correct and
+re-export any YOLO dataset.
+
+If a shorter list would strand boxes on higher class numbers, the app says how
+many and asks before switching.
+
 ### 3. Choose the output folder and formats
 
 Click **Choose output folder…**, then tick what you want written:
@@ -521,6 +543,7 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.5.0 | Load your own class list (labelImg `classes.txt`) or add classes one at a time; the app now works with no model at all |
 | 1.4.1 | Fixed a crash on every annotate run in 1.4.0 (`unexpected keyword argument 'labelling'`) |
 | 1.4.0 | Three labelling modes, including detector-only; Tab/Enter review workflow; export blocked while boxes are unlabelled |
 | 1.3.0 | Export folders can be named; plates can be marked contaminated; ⌘Z undo; existing YOLO labels can be pre-loaded |

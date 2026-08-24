@@ -37,7 +37,8 @@ def _clean_boxes(boxes):
 
 
 def save(path, *, image_folder, model_path, output_folder, export_options,
-         detection, class_names, records, image_sizes):
+         detection, class_names, records, image_sizes,
+         custom_classes=False, class_list_source=None):
     """Write the project. Returns the path actually written."""
     path = Path(path)
     if path.suffix != EXTENSION:
@@ -70,6 +71,8 @@ def save(path, *, image_folder, model_path, output_folder, export_options,
         "export_options": dict(export_options),
         "detection": dict(detection),
         "class_names": list(class_names),
+        "custom_classes": bool(custom_classes),
+        "class_list_source": class_list_source,
         "images": images,
     }
 
@@ -127,6 +130,8 @@ def load(path):
         "export_options": payload.get("export_options") or {},
         "detection": payload.get("detection") or {},
         "class_names": payload.get("class_names") or [],
+        "custom_classes": bool(payload.get("custom_classes")),
+        "class_list_source": payload.get("class_list_source"),
         "records": records,
         "image_sizes": sizes,
         "saved_at": payload.get("saved_at"),
