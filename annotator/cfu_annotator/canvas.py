@@ -27,7 +27,7 @@ process segfaults inside `QGraphicsScene::mouseMoveEvent`. Keep item geometry
 independent of the view.
 """
 
-from PyQt5.QtCore import QPointF, QRectF, Qt, pyqtSignal
+from PyQt5.QtCore import QEvent, QPointF, QRectF, Qt, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
     QFont,
@@ -60,6 +60,12 @@ ITEM_PAD = 2.0           # constant bounding-rect padding, in image pixels
 MODE_SELECT = "select"
 MODE_DRAW = "draw"
 
+# A box the model found but nobody has labelled yet. Kept out of the 0..n-1
+# class range on purpose: counts, CSV columns and YOLO ids all guard on that
+# range, so an unlabelled box can never be silently counted as a real class.
+UNLABELLED = -1
+UNLABELLED_COLOR = "#8d8d8d"
+
 HANDLE_KEYS = ("tl", "tr", "bl", "br", "t", "b", "l", "r")
 
 _HANDLE_CURSORS = {
@@ -71,6 +77,8 @@ _HANDLE_CURSORS = {
 
 
 def class_color(cls_id):
+    if cls_id is None or cls_id < 0:
+        return QColor(UNLABELLED_COLOR)
     return QColor(CLASS_COLORS[cls_id % len(CLASS_COLORS)])
 
 
@@ -80,13 +88,19 @@ class BoxItem(QGraphicsRectItem):
     Geometry depends only on `rect()` — see the module docstring.
     """
 
-    def __init__(self, rect, cls_id, canvas, conf=None):
+    def __init__(self, rect, cls_id, canvas, conf=None, unconfirmed=False):
         super().__init__(rect)
         self.cls_id = cls_id
         self.conf = conf
+        # True for a label the model suggested that nobody has agreed with yet.
+        self.unconfirmed = bool(unconfirmed)
         self.canvas = canvas
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.refresh_z()
+
+    def needs_attention(self):
+        """Unlabelled, or carrying a suggestion the user hasn't accepted."""
+        return self.cls_id < 0 or self.unconfirmed
 
     def refresh_z(self):
         """Small boxes sit on top, so a colony inside a clump stays clickable."""
@@ -115,6 +129,9 @@ class BoxItem(QGraphicsRectItem):
         pen = QPen(color)
         pen.setCosmetic(True)              # constant line width at any zoom
         pen.setWidth(3 if selected else 2)
+        if self.needs_attention():
+            # Dashed = still needs a decision. Grey as well when unlabelled.
+            pen.setStyle(Qt.DashLine)
         painter.setPen(pen)
         if selected:
             fill = QColor(color)
@@ -126,11 +143,14 @@ class BoxItem(QGraphicsRectItem):
 
     def to_dict(self):
         r = self.rect().normalized()
-        return {
+        box = {
             "cls": self.cls_id,
             "conf": self.conf,
             "xyxy": [r.left(), r.top(), r.right(), r.bottom()],
         }
+        if self.unconfirmed:
+            box["unconfirmed"] = True      # absent means confirmed
+        return box
 
 
 class ImageCanvas(QGraphicsView):
@@ -209,7 +229,9 @@ class ImageCanvas(QGraphicsView):
             self.active_class = 0
 
     def class_name(self, cls_id):
-        if 0 <= cls_id < len(self.class_names):
+        if cls_id is None or cls_id < 0:
+            return "unlabelled"
+        if cls_id < len(self.class_names):
             return self.class_names[cls_id]
         return f"class {cls_id}"
 
@@ -276,7 +298,8 @@ class ImageCanvas(QGraphicsView):
         for box in boxes:
             x1, y1, x2, y2 = box["xyxy"]
             rect = QRectF(QPointF(x1, y1), QPointF(x2, y2)).normalized()
-            item = BoxItem(rect, int(box["cls"]), self, box.get("conf"))
+            item = BoxItem(rect, int(box["cls"]), self, box.get("conf"),
+                           unconfirmed=bool(box.get("unconfirmed")))
             self._scene.addItem(item)
         self.notify_boxes_changed()
 
@@ -331,6 +354,7 @@ class ImageCanvas(QGraphicsView):
             if isinstance(item, BoxItem):
                 item.cls_id = cls_id
                 item.conf = None       # no longer the model's prediction
+                item.unconfirmed = False   # an explicit label is a decision
                 item.update()
                 changed += 1
         if changed:
@@ -342,6 +366,59 @@ class ImageCanvas(QGraphicsView):
 
     def selected_count(self):
         return sum(1 for i in self._scene.selectedItems() if isinstance(i, BoxItem))
+
+    def items_needing_attention(self):
+        """Boxes still awaiting a decision, in reading order."""
+        return sorted(
+            (i for i in self.box_items() if i.needs_attention()),
+            key=lambda i: (round(i.rect().top()), round(i.rect().left())),
+        )
+
+    def unlabelled_count(self):
+        return sum(1 for i in self.box_items() if i.cls_id < 0)
+
+    def unconfirmed_count(self):
+        return sum(1 for i in self.box_items() if i.unconfirmed and i.cls_id >= 0)
+
+    def focus_next_unresolved(self, forward=True):
+        """Select the next box needing a decision and bring it into view."""
+        pending = self.items_needing_attention()
+        if not pending:
+            self.status_message.emit("Nothing left to label on this image")
+            return False
+
+        current = next((i for i in self._scene.selectedItems()
+                        if isinstance(i, BoxItem)), None)
+        if current in pending:
+            index = pending.index(current)
+            nxt = pending[(index + (1 if forward else -1)) % len(pending)]
+        else:
+            nxt = pending[0] if forward else pending[-1]
+
+        self._scene.clearSelection()
+        nxt.setSelected(True)
+        self.centerOn(nxt.rect().center())
+        remaining = len(pending)
+        self.status_message.emit(
+            f"{remaining} box(es) still need a label — press 1-"
+            f"{max(1, len(self.class_names))} to assign one"
+        )
+        return True
+
+    def accept_selected(self):
+        """Agree with the model's suggestion on the selected box(es)."""
+        if self.locked_out():
+            return 0
+        accepted = 0
+        for item in self._scene.selectedItems():
+            if isinstance(item, BoxItem) and item.unconfirmed and item.cls_id >= 0:
+                item.unconfirmed = False
+                item.update()
+                accepted += 1
+        if accepted:
+            self.notify_boxes_changed(user_edit=True)
+            self.status_message.emit(f"Accepted {accepted} suggested label(s)")
+        return accepted
 
     def counts_by_class(self):
         counts = [0] * max(1, len(self.class_names))
@@ -386,6 +463,7 @@ class ImageCanvas(QGraphicsView):
             return
         item.cls_id = cls_id
         item.conf = None
+        item.unconfirmed = False
         item.update()
         self.notify_boxes_changed(user_edit=True)
 
@@ -518,6 +596,10 @@ class ImageCanvas(QGraphicsView):
 
     def _draw_label(self, painter, metrics, item, device, color):
         text = self.class_name(item.cls_id)
+        if item.cls_id < 0:
+            text = "?"
+        elif item.unconfirmed:
+            text = f"{text}?"          # a suggestion, not yet agreed with
         if self.show_confidence and item.conf is not None:
             text = f"{text} {item.conf:.2f}"
 
@@ -783,6 +865,14 @@ class ImageCanvas(QGraphicsView):
         self._pan_origin = pos
         self.viewport().setCursor(Qt.ClosedHandCursor)
 
+    def event(self, event):
+        """Claim Tab before Qt spends it on focus navigation."""
+        if event.type() == QEvent.KeyPress and event.key() in (Qt.Key_Tab,
+                                                               Qt.Key_Backtab):
+            self.focus_next_unresolved(forward=event.key() == Qt.Key_Tab)
+            return True
+        return super().event(event)
+
     def keyPressEvent(self, event):
         key = event.key()
         if key == Qt.Key_Space:
@@ -798,11 +888,25 @@ class ImageCanvas(QGraphicsView):
             self._scene.clearSelection()
             event.accept()
             return
+        if key in (Qt.Key_Return, Qt.Key_Enter):
+            if self.accept_selected():
+                self.focus_next_unresolved()
+            event.accept()
+            return
         if Qt.Key_1 <= key <= Qt.Key_9:
             index = key - Qt.Key_1
             if index < len(self.class_names):
                 if self.selected_count():
+                    # Labelling a box that was awaiting a decision moves on to
+                    # the next one, so a plate can be worked through with one
+                    # keystroke per colony.
+                    was_pending = any(
+                        i.needs_attention() for i in self._scene.selectedItems()
+                        if isinstance(i, BoxItem)
+                    )
                     self.set_class_of_selected(index)
+                    if was_pending:
+                        self.focus_next_unresolved()
                 else:
                     self.set_active_class(index)
                     self.status_message.emit(

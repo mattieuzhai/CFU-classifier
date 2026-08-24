@@ -226,6 +226,36 @@ already exist, the app asks before overwriting them.
 
 ### 4. Annotate
 
+#### Who assigns the labels
+
+The **Detection** section starts with a choice about what to do with the classes
+the model predicts. Detection itself is identical in all three — only the labels
+differ:
+
+| Mode | What you get |
+|---|---|
+| **Model labels the colonies** | The default. Boxes arrive with the model's class, ready to correct if you spot a mistake. |
+| **Suggest labels — I confirm** | Boxes arrive dashed, labelled `GM?`, `BFU?`. Nothing counts as reviewed until you agree with it. |
+| **Detect only — I label** | The model finds the colonies and nothing more. Every box arrives grey, dashed and labelled `?`. |
+
+The last two turn a plate into a worklist, and the keyboard is built for it:
+
+- **Tab** jumps to the next box awaiting a decision, selects it and centres the
+  view. **Shift+Tab** goes back.
+- **1**–**9** assigns that class *and moves straight to the next one*, so a
+  plate is `1 1 2 1 3 …` — one keystroke per colony.
+- **Enter** accepts a suggested label as-is and moves on.
+
+The counts panel shows what's left (`136 unlabelled — Tab to step through
+them`), and unlabelled boxes are deliberately kept out of the class totals: an
+unlabelled colony is not a zero, it's an unanswered question.
+
+**Export is blocked while any box is still unlabelled.** An unlabelled box has
+no class to put in a column and no valid YOLO id, so a spreadsheet produced then
+would quietly under-count. The dialog names the plates and offers to jump
+straight to the first one. Unconfirmed *suggestions* only warn — they carry a
+real class, so they can export; you just get told they haven't been reviewed.
+
 **Annotate this image** (or press `R`) runs the model on the plate on screen.
 Boxes appear with a coloured label per class, and the counts panel on the right
 updates immediately.
@@ -270,6 +300,8 @@ labelImg/CVAT:
 | Mark an image complete | **Mark as finalized**, or ⌘L |
 | Write a plate off | **Mark as contaminated**, or ⇧⌘X |
 | Undo the last change | ⌘Z (Ctrl+Z on Windows) |
+| Go to the next unlabelled box | `Tab` (`Shift+Tab` for the previous) |
+| Accept a suggested label | `Enter` |
 
 After you draw a box the tool returns to **Select / Edit** on its own, so the
 next click edits rather than drawing another box by accident. If you're adding
@@ -434,6 +466,12 @@ The build is driven by `CFU_Annotator.spec`. Two things in it matter:
   half-registered. The bundle then builds cleanly and dies on launch with
   `cannot initialize type "RpcBackendOptions"`. Only exclude whole packages.
 
+## Python version
+
+**Python 3.12** (3.12.2 is what `.venv`, the training scripts and the bundled
+app all use). The floor is 3.11 — numpy 2.4.4 requires `>=3.11` and torch
+requires `>=3.10` — but 3.12 is the only version this has been tested on.
+
 ## For developers
 
 | File | Purpose |
@@ -476,6 +514,7 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.4.0 | Three labelling modes, including detector-only; Tab/Enter review workflow; export blocked while boxes are unlabelled |
 | 1.3.0 | Export folders can be named; plates can be marked contaminated; ⌘Z undo; existing YOLO labels can be pre-loaded |
 | 1.2.0 | Exports go into their own dated folder; annotated images can be exported; the draw tool returns to Select after each box; settings are remembered between launches |
 | 1.1.1 | Fixed a crash when zooming with the scroll wheel on an annotated image |

@@ -25,11 +25,14 @@ def _clean_boxes(boxes):
     for box in boxes or []:
         xyxy = [float(v) for v in box["xyxy"]]
         conf = box.get("conf")
-        out.append({
+        entry = {
             "cls": int(box["cls"]),
             "conf": None if conf is None else round(float(conf), 4),
             "xyxy": [round(v, 2) for v in xyxy],
-        })
+        }
+        if box.get("unconfirmed"):
+            entry["unconfirmed"] = True
+        out.append(entry)
     return out
 
 
