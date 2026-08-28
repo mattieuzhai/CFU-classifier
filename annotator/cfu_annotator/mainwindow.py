@@ -661,6 +661,16 @@ class MainWindow(QMainWindow):
         class_row.addWidget(self.button_load_classes, 1)
         class_row.addWidget(self.button_add_class)
 
+        self.button_model_classes = QPushButton("Use the model's classes")
+        self.button_model_classes.setToolTip(
+            "Drop your own class list and go back to the ones the loaded model "
+            "predicts.\n\nExisting boxes keep their class numbers, so their "
+            "names change to the model's — you'll be told if any end up "
+            "outside its class list."
+        )
+        self.button_model_classes.clicked.connect(self.use_model_classes)
+        self.button_model_classes.setEnabled(False)
+
         self.label_class_source = QLabel(
             "No classes yet — load a model, or load your own list."
         )
@@ -670,6 +680,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(hint)
         layout.addWidget(self.list_classes)
         layout.addLayout(class_row)
+        layout.addWidget(self.button_model_classes)
         layout.addWidget(self.label_class_source)
         layout.addWidget(self.label_selected)
         layout.addWidget(self.button_apply_class)
@@ -926,6 +937,55 @@ class MainWindow(QMainWindow):
             f"{len(existing) + 1} to apply it"
         )
 
+    def use_model_classes(self, confirm=True):
+        """Drop a custom class list and go back to the model's.
+
+        The counterpart to "Load list…": without this, loading your own list
+        was a one-way door — the only way back was uploading another file, and
+        the choice persisted between sessions.
+        """
+        if not self.detector:
+            QMessageBox.information(
+                self, "No model loaded",
+                "There's no model to take classes from. Load a model (.pt) "
+                "first, or load a different class list.",
+            )
+            return False
+        if not self.custom_classes:
+            self._show_status("Already using the model's classes")
+            return False
+
+        model_names = list(self.detector.class_names)
+        stranded = self._boxes_outside(len(model_names))
+        if confirm:
+            extra = (
+                f"\n\n{stranded} existing box(es) have a class number beyond "
+                f"the model's {len(model_names)} class(es). They keep their "
+                f"number but will show as unnamed and won't be counted until "
+                f"they are relabelled." if stranded else ""
+            )
+            answer = QMessageBox.question(
+                self, "Use the model's classes?",
+                f"Replace your {len(self.canvas.class_names)} class(es) with "
+                f"the model's {len(model_names)}?\n\n"
+                f"Yours:      {', '.join(self.canvas.class_names)}\n"
+                f"The model's: {', '.join(model_names)}\n\n"
+                f"Existing boxes keep their class numbers, so their names "
+                f"change to the model's.{extra}",
+                QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel,
+            )
+            if answer != QMessageBox.Yes:
+                return False
+
+        self._set_class_names(model_names, custom=False, source=None)
+        self._mark_dirty()
+        self._save_settings()      # also clears the remembered list
+        self._show_status(
+            f"Back on the model's classes: {', '.join(model_names)}"
+            + (f" — {stranded} box(es) now sit outside them" if stranded else "")
+        )
+        return True
+
     def _boxes_outside(self, count):
         """How many existing boxes carry a class id at or beyond `count`."""
         total = 0
@@ -993,6 +1053,9 @@ class MainWindow(QMainWindow):
             self.label_class_source.setText(
                 "No classes yet — load a model, or load your own list."
             )
+        self.button_model_classes.setEnabled(
+            self.custom_classes and self.detector is not None
+        )
         self._refresh_counts()
 
     def _on_model_loaded(self, detector):
@@ -1505,6 +1568,23 @@ class MainWindow(QMainWindow):
 
     def _on_label_mode_changed(self):
         mode = self.label_mode()
+        # Switching to a mode where the model assigns labels while a custom
+        # list is in force means the model's class numbers would be read
+        # against someone else's names. Offer the obvious fix.
+        if (mode in (LABEL_MODE_MODEL, LABEL_MODE_SUGGEST)
+                and self.custom_classes and self.detector
+                and list(self.detector.class_names) != list(self.canvas.class_names)):
+            answer = QMessageBox.question(
+                self, "Switch to the model's classes?",
+                f"This mode uses the labels the model predicts, but the class "
+                f"list is still your own.\n\n"
+                f"Yours:      {', '.join(self.canvas.class_names)}\n"
+                f"The model's: {', '.join(self.detector.class_names)}\n\n"
+                f"Use the model's classes?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes,
+            )
+            if answer == QMessageBox.Yes:
+                self.use_model_classes(confirm=False)
         self._save_settings()
         self._show_status({
             LABEL_MODE_MODEL: "The model's labels will be used as-is",
@@ -2378,6 +2458,9 @@ class MainWindow(QMainWindow):
         self.button_labels.setEnabled(has_images)
         self.button_apply_class.setEnabled(
             self.canvas.selected_count() > 0 and not locked
+        )
+        self.button_model_classes.setEnabled(
+            self.custom_classes and self.detector is not None
         )
         if locked and self.canvas.mode == MODE_DRAW:
             self._set_mode(MODE_SELECT)

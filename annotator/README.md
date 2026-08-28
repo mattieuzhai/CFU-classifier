@@ -148,8 +148,15 @@ in the labelImg mould, with the project file, the statuses and the export
 folders on top. Pair it with **Choose labels folder…** to open, correct and
 re-export any YOLO dataset.
 
-If a shorter list would strand boxes on higher class numbers, the app says how
-many and asks before switching.
+**Use the model's classes** goes back the other way — it drops your list and
+returns to the ones the loaded model predicts, clearing the remembered list so
+the next session starts fresh too. Switching the labelling mode to *Model
+labels* or *Suggest* while your own list is still in force also offers the
+swap, since those modes read the model's class numbers and would otherwise
+report them under someone else's names.
+
+Either way the app asks first, and if a shorter list would strand boxes on
+higher class numbers it says how many before switching.
 
 ### 3. Choose the output folder and formats
 
@@ -543,6 +550,7 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.5.1 | A way back from a custom class list to the model's, including a prompt when switching to a model-driven labelling mode |
 | 1.5.0 | Load your own class list (labelImg `classes.txt`) or add classes one at a time; the app now works with no model at all |
 | 1.4.1 | Fixed a crash on every annotate run in 1.4.0 (`unexpected keyword argument 'labelling'`) |
 | 1.4.0 | Three labelling modes, including detector-only; Tab/Enter review workflow; export blocked while boxes are unlabelled |
