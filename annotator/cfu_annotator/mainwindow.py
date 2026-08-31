@@ -45,9 +45,21 @@ from . import (
 from .canvas import (
     MODE_DRAW, MODE_SELECT, UNLABELLED, ImageCanvas, class_color,
 )
-from .workers import ImageExportWorker, InferenceWorker, ModelLoadWorker
+from .workers import (
+    ImageDecodeWorker,
+    ImageExportWorker,
+    InferenceWorker,
+    ModelLoadWorker,
+)
 
 UNDO_DEPTH = 100       # plenty for a session's worth of hand corrections
+
+#: The stack is also capped by how many boxes it is holding, not just by how
+#: many steps. Each snapshot is a full copy of one image's boxes, so on a plate
+#: with 2000 colonies 100 of them come to ~55 MB of Python objects that is never
+#: released for the rest of the session. Ordinary plates sit well inside this
+#: budget and keep all 100 steps; only very busy ones start trimming.
+UNDO_BOX_BUDGET = 50_000
 
 # What to do with the classes the model predicts.
 LABEL_MODE_MODEL = "model"        # trust them
@@ -66,10 +78,20 @@ def _compact(group):
     return group
 
 
+#: Class swatches are fixed for the life of the process, so build each once
+#: rather than allocating a pixmap per row every time the counts refresh.
+_SWATCH_CACHE = {}
+
+
 def _swatch(color, size=12):
-    pixmap = QPixmap(size, size)
-    pixmap.fill(QColor(color))
-    return QIcon(pixmap)
+    color = QColor(color)
+    key = (color.rgba(), size)
+    icon = _SWATCH_CACHE.get(key)
+    if icon is None:
+        pixmap = QPixmap(size, size)
+        pixmap.fill(color)
+        icon = _SWATCH_CACHE[key] = QIcon(pixmap)
+    return icon
 
 
 class MainWindow(QMainWindow):
@@ -96,6 +118,11 @@ class MainWindow(QMainWindow):
         self.model_worker = None
         self.infer_worker = None
         self.image_worker = None
+        self.decode_worker = None
+        # Bumped on every navigation, so the result of a decode the user has
+        # already moved past can be recognised and thrown away.
+        self._decode_token = 0
+        self._decode_pending = None
         self._pending_export = None
         # Held until the restored model finishes loading, so the summary of what
         # was restored isn't immediately overwritten by "Model ready".
@@ -202,9 +229,12 @@ class MainWindow(QMainWindow):
         )
         self.action_contaminated.setCheckable(True)
         image_menu.addSeparator()
-        image_menu.addAction("Annotate this image", self.annotate_current,
-                             QKeySequence("R"))
-        image_menu.addAction("Annotate all remaining…", self.annotate_all)
+        # The same QActions the toolbar uses. Separate copies used to exist
+        # here, and because only the toolbar's were disabled while the model
+        # ran, the menu's shortcut could start a second inference run on top of
+        # the first — which then wrote its results over the user's work.
+        image_menu.addAction(self.button_annotate)
+        image_menu.addAction(self.button_annotate_all)
 
     def _group_image_list(self):
         group = QGroupBox("Images")
@@ -273,7 +303,14 @@ class MainWindow(QMainWindow):
         # The two run-the-model actions live here rather than in the sidebar:
         # they are the primary actions and the toolbar is always visible.
         self.button_annotate = QAction("▶  Annotate image", self)
-        self.button_annotate.setToolTip("Run the model on the image on screen (R)")
+        # Deliberately behind a modifier. This is a destructive action — it
+        # replaces every box on the plate — and it used to be plain "R", one
+        # row above the 4 and 5 keys that labelling leans on all day. A slipped
+        # finger while pressing 1-9 should not offer to re-run the model.
+        self.button_annotate.setShortcut(QKeySequence("Ctrl+R"))
+        self.button_annotate.setToolTip(
+            "Run the model on the image on screen (⌘R)"
+        )
         self.button_annotate.triggered.connect(self.annotate_current)
         bar.addAction(self.button_annotate)
 
@@ -1131,15 +1168,20 @@ class MainWindow(QMainWindow):
 
         self.index = index
         path = self.images[index]
-        if not self.canvas.load_image(path):
-            QMessageBox.warning(
-                self, "Cannot open image",
-                f"'{path.name}' could not be opened. It may be corrupt or not "
-                "really a JPEG/PNG.",
-            )
-            self.canvas.clear_image()
+
+        # Reading the header is effectively free and gives us the dimensions,
+        # which is all the canvas needs in order to show and edit the boxes. The
+        # pixels follow from a worker thread a fraction of a second later, so
+        # pressing Next no longer blocks the window on a 40-110 megapixel decode.
+        size = self.image_sizes.get(path.name) or self._read_image_size(path)
+        if size:
+            self.image_sizes[path.name] = size
+            self.canvas.begin_loading(size)
+            self._request_decode(path)
         else:
-            self.image_sizes[path.name] = self.canvas.image_size()
+            self._cancel_pending_decode()
+            self.canvas.clear_image()
+            self._warn_unopenable(path.name)
 
         record = self.records.get(path.name)
         self.canvas.set_locked(False)     # allow the programmatic load
@@ -1155,6 +1197,72 @@ class MainWindow(QMainWindow):
         self._update_enabled_state()
         self._refresh_pre_edit()
         self.zoom_label.setText(f"{self.canvas.zoom_percent():.0f}%")
+
+    def _read_image_size(self, path):
+        """(width, height) from the file header, or None if it can't be read."""
+        size = QImageReader(str(path)).size()
+        if size.isValid() and size.width() > 0 and size.height() > 0:
+            return (size.width(), size.height())
+        return None
+
+    def _warn_unopenable(self, name):
+        QMessageBox.warning(
+            self, "Cannot open image",
+            f"'{name}' could not be opened. It may be corrupt or not "
+            "really a JPEG/PNG.",
+        )
+
+    def _cancel_pending_decode(self):
+        """Make any decode still in flight irrelevant."""
+        self._decode_token += 1
+        self._decode_pending = None
+
+    def _request_decode(self, path):
+        self._decode_token += 1
+        token = self._decode_token
+        # "not None" rather than "isRunning": a worker counts as outstanding
+        # until its result has actually been handled, otherwise a request in the
+        # gap between run() returning and the queued signal arriving would start
+        # a second decode and put two plates in memory at once.
+        if self.decode_worker is not None:
+            # Strictly one decode at a time: two plates in flight would double
+            # the peak memory, and clicking quickly through a folder would pile
+            # up decodes of images nobody is going to look at. Keeping only the
+            # latest request means the intermediate ones are never decoded.
+            self._decode_pending = (token, path)
+            return
+        self._start_decode(token, path)
+
+    def _start_decode(self, token, path):
+        self._decode_pending = None
+        worker = ImageDecodeWorker(token, path, self)
+        worker.decoded.connect(self._on_image_decoded)
+        worker.finished.connect(worker.deleteLater)
+        self.decode_worker = worker
+        worker.start()
+
+    def _on_image_decoded(self, token, image):
+        if self.sender() is self.decode_worker:
+            self.decode_worker = None
+        if token == self._decode_token:
+            if self.canvas.set_decoded_image(image):
+                # The header gave us a size up front, but the decoded plate is
+                # the authority: a file swapped since the project was saved
+                # would otherwise normalise its YOLO labels against the old
+                # dimensions.
+                if 0 <= self.index < len(self.images):
+                    self.image_sizes[self.images[self.index].name] = \
+                        self.canvas.image_size()
+                self.zoom_label.setText(f"{self.canvas.zoom_percent():.0f}%")
+            else:
+                name = (self.images[self.index].name
+                        if 0 <= self.index < len(self.images) else "the image")
+                self.canvas.clear_image()
+                self._update_enabled_state()
+                self._warn_unopenable(name)
+        pending = self._decode_pending
+        if pending is not None:
+            self._start_decode(*pending)
 
     def _store_current(self):
         """Remember the boxes for the image we're leaving."""
@@ -1344,7 +1452,15 @@ class MainWindow(QMainWindow):
                 return
             name = self.images[self.index].name
         self._undo_stack.append(self._snapshot(name))
+        self._trim_undo()
+
+    def _trim_undo(self):
+        """Drop the oldest steps once the stack is too deep or too large."""
         del self._undo_stack[:-UNDO_DEPTH]
+        held = sum(len(state["boxes"]) for state in self._undo_stack)
+        while len(self._undo_stack) > 1 and held > UNDO_BOX_BUDGET:
+            held -= len(self._undo_stack[0]["boxes"])
+            del self._undo_stack[0]
         self._refresh_undo_action()
 
     def _refresh_undo_action(self):
@@ -1466,11 +1582,25 @@ class MainWindow(QMainWindow):
                 "to re-run detection on it.",
             )
             return
-        if self.canvas.get_boxes():
+        boxes = self.canvas.get_boxes()
+        if boxes:
+            if (self.records.get(path.name) or {}).get("edited"):
+                title = "Discard your hand-made annotations?"
+                detail = (
+                    f"You have annotated '{path.name}' by hand — it currently "
+                    f"has {len(boxes)} box(es).\n\nRunning the model again "
+                    "throws all of that away and replaces it with fresh "
+                    "predictions."
+                )
+            else:
+                title = "Replace existing boxes?"
+                detail = (
+                    f"'{path.name}' already has {len(boxes)} box(es).\n\n"
+                    "Running the model again will replace them with fresh "
+                    "predictions."
+                )
             answer = QMessageBox.question(
-                self, "Replace existing boxes?",
-                f"'{path.name}' already has {len(self.canvas.get_boxes())} box(es).\n\n"
-                "Running the model again will replace them with fresh predictions.",
+                self, title, detail,
                 QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel,
             )
             if answer != QMessageBox.Yes:
@@ -1480,26 +1610,44 @@ class MainWindow(QMainWindow):
     def annotate_all(self):
         if not self._ready_to_annotate():
             return
-        pending, skipped_final = [], 0
+        pending, skipped_locked, skipped_by_hand = [], 0, 0
         for path in self.images:
             record = self.records.get(path.name) or {}
             if status.is_locked(record):
-                skipped_final += 1        # never touch what the user locked
-            elif not record.get("annotated"):
+                skipped_locked += 1       # never touch what the user locked
+            elif record.get("annotated"):
+                pass                      # the model has already run on it
+            elif record.get("edited"):
+                # Boxes drawn or labelled by hand on a plate the model never
+                # saw. "Everything not annotated yet" must not include work
+                # someone did themselves: replacing it here is silent, wholesale
+                # and easy to miss, since the plate need not even be on screen.
+                skipped_by_hand += 1
+            else:
                 pending.append(path)
 
         if not pending:
             QMessageBox.information(
                 self, "Nothing to do",
-                "Every image has already been annotated or is finalized. Use "
-                "'Annotate this image' to re-run the model on a single plate.",
+                "Every image has already been annotated, is locked, or was "
+                "annotated by hand. Use 'Annotate image' to re-run the model on "
+                "a single plate.",
             )
             return
 
-        note = (
-            f"\n\n{skipped_final} finalized image(s) will be left untouched."
-            if skipped_final else ""
-        )
+        notes = []
+        if skipped_locked:
+            notes.append(
+                f"{skipped_locked} finalized or contaminated image(s) will be "
+                "left untouched."
+            )
+        if skipped_by_hand:
+            notes.append(
+                f"{skipped_by_hand} image(s) you annotated by hand will be left "
+                "untouched. To replace one of those, open it and use "
+                "'Annotate image'."
+            )
+        note = ("\n\n" + "\n\n".join(notes)) if notes else ""
         answer = QMessageBox.question(
             self, "Annotate all remaining",
             f"Run the model on {len(pending)} image(s)?{note}\n\n"
@@ -1512,6 +1660,11 @@ class MainWindow(QMainWindow):
         self._start_inference(pending)
 
     def _ready_to_annotate(self):
+        if getattr(self, "_busy", False):
+            self._show_status(
+                "The model is already running — cancel it before starting again"
+            )
+            return False
         if self.detector is None:
             QMessageBox.information(self, "No model", "Choose a model (.pt) first.")
             return False
@@ -1832,6 +1985,7 @@ class MainWindow(QMainWindow):
         self._pre_edit = None
         self._refresh_undo_action()
 
+        self._cancel_pending_decode()
         self.canvas.clear_image()
         self.list_images.clear()
         self.label_labels.setText("No labels loaded")
@@ -1902,6 +2056,7 @@ class MainWindow(QMainWindow):
         self.project_path = Path(path)
         self.index = -1
         self.images = []
+        self._cancel_pending_decode()
         self.canvas.clear_image()
         self.list_images.clear()
 
@@ -2357,8 +2512,7 @@ class MainWindow(QMainWindow):
         # to come from the snapshot taken when this image last settled.
         if self._pre_edit and self._pre_edit["name"] == name:
             self._undo_stack.append(self._pre_edit)
-            del self._undo_stack[:-UNDO_DEPTH]
-            self._refresh_undo_action()
+            self._trim_undo()
         record = self._record(name, create=True)
         record["edited"] = True
         self._mark_dirty()
@@ -2374,27 +2528,43 @@ class MainWindow(QMainWindow):
             self.coord_label.setText("")
         self.zoom_label.setText(f"{self.canvas.zoom_percent():.0f}%")
 
-    def _refresh_counts(self):
-        names = self.canvas.class_names or []
-        counts = self.canvas.counts_by_class() if names else []
+    def _build_counts_table(self, names):
+        """Lay out one row per class. Only needed when the class list changes."""
+        self._counts_layout = list(names)
+        self._count_cells = []
+        self._total_cell = None
         self.table_counts.setRowCount(len(names) + (1 if names else 0))
         for row, name in enumerate(names):
             label = QTableWidgetItem(name)
             label.setIcon(_swatch(class_color(row)))
+            value = QTableWidgetItem("0")
             self.table_counts.setItem(row, 0, label)
-            self.table_counts.setItem(row, 1, QTableWidgetItem(str(counts[row])))
+            self.table_counts.setItem(row, 1, value)
+            self._count_cells.append(value)
         if names:
             total = QTableWidgetItem("Total")
             font = total.font()
             font.setBold(True)
             total.setFont(font)
-            value = QTableWidgetItem(str(sum(counts)))
+            value = QTableWidgetItem("0")
             value.setFont(font)
             self.table_counts.setItem(len(names), 0, total)
             self.table_counts.setItem(len(names), 1, value)
+            self._total_cell = value
 
-        pending = self.canvas.unlabelled_count()
-        unconfirmed = self.canvas.unconfirmed_count()
+    def _refresh_counts(self):
+        names = self.canvas.class_names or []
+        counts, pending, unconfirmed = self.canvas.tally()
+        if not names:
+            counts = []
+        # Rebuilding every cell on every box change churned widgets for nothing;
+        # the rows only ever change when the class list does.
+        if getattr(self, "_counts_layout", None) != names:
+            self._build_counts_table(names)
+        for row, value in enumerate(self._count_cells):
+            value.setText(str(counts[row]))
+        if self._total_cell is not None:
+            self._total_cell.setText(str(sum(counts)))
         if pending or unconfirmed:
             bits = []
             if pending:
@@ -2491,6 +2661,9 @@ class MainWindow(QMainWindow):
             if worker:
                 worker.cancel()
                 worker.wait(5000)
+        self._cancel_pending_decode()
+        if self.decode_worker:
+            self.decode_worker.wait(5000)
         if not self._confirm_discard("Quitting"):
             event.ignore()
             return

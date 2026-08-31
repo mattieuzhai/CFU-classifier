@@ -285,13 +285,18 @@ would quietly under-count. The dialog names the plates and offers to jump
 straight to the first one. Unconfirmed *suggestions* only warn — they carry a
 real class, so they can export; you just get told they haven't been reviewed.
 
-**Annotate this image** (or press `R`) runs the model on the plate on screen.
+**Annotate image** (or press ⌘R / Ctrl+R) runs the model on the plate on screen.
 Boxes appear with a coloured label per class, and the counts panel on the right
-updates immediately.
+updates immediately. Running it on a plate that already has boxes always asks
+first, and if those boxes are ones you drew or labelled yourself it says so
+plainly — **Cancel** is the default answer either way.
 
-**Annotate all remaining…** runs the model over every image not yet annotated.
-Progress is shown per tile, and **Cancel** stops it — everything already
-finished is kept.
+**Annotate all remaining…** runs the model over every image that has no
+annotations at all. It skips plates you finalized or marked contaminated, and
+it skips plates you annotated by hand, telling you how many of each it left
+alone. To replace a plate you worked on yourself, open it and use **Annotate
+image**, which will ask you to confirm. Progress is shown per tile, and
+**Cancel** stops it — everything already finished is kept.
 
 #### About tiling
 
@@ -325,12 +330,21 @@ labelImg/CVAT:
 | Fit to window | Press `F` |
 | Pan | Drag empty space, or hold Space and drag |
 | Next / previous image | `D` / `A`, the buttons under the image, or click a row in the image list |
+| Re-run the model on this image | ⌘R (Ctrl+R on Windows) — always asks before replacing boxes |
 | Jump to any image | Click its row in the image list |
 | Mark an image complete | **Mark as finalized**, or ⌘L |
 | Write a plate off | **Mark as contaminated**, or ⇧⌘X |
 | Undo the last change | ⌘Z (Ctrl+Z on Windows) |
 | Go to the next unlabelled box | `Tab` (`Shift+Tab` for the previous) |
 | Accept a suggested label | `Enter` |
+
+Moving between images is immediate. A full-resolution plate takes a third to
+half a second to decode, so that happens on a background thread: the boxes and
+the image list update at once, a **Loading image…** badge sits in the top-left
+corner, and the plate itself appears a moment later. You can select, move and
+relabel boxes while it is still arriving. Clicking quickly through a folder
+never queues up decodes of images you skipped past — only the one you stop on
+is decoded.
 
 After you draw a box the tool returns to **Select / Edit** on its own, so the
 next click edits rather than drawing another box by accident. If you're adding
@@ -342,6 +356,10 @@ and edits stick when you move between images. The class highlighted in the
 right-hand list is the one new boxes get; relabelling an existing box is always
 explicit, so choosing what to draw next can't silently change a box you already
 have selected.
+
+On a plate with thousands of colonies the undo history keeps fewer steps than
+the usual hundred, so that a long session can't fill memory with old copies of
+the same plate. Ordinary plates keep the full hundred.
 
 **⌘Z undoes the last thing you did** — drawing, moving, resizing, relabelling or
 deleting a box, finalizing a plate, marking one contaminated, and re-running the
@@ -550,6 +568,8 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.6.1 | Fixed three ways a model re-run could throw away hand-made annotations: "Annotate all remaining" no longer replaces plates you annotated yourself, the Image menu no longer carried duplicate Annotate actions that stayed live during a run, and the re-run shortcut moved from a bare `R` to ⌘R |
+| 1.6.0 | Performance: plates decode on a background thread so navigation no longer freezes the window, the canvas redraws 3-6x faster on busy plates, inference uses ~400 MB less memory per plate, and the undo history is capped by size as well as depth |
 | 1.5.1 | A way back from a custom class list to the model's, including a prompt when switching to a model-driven labelling mode |
 | 1.5.0 | Load your own class list (labelImg `classes.txt`) or add classes one at a time; the app now works with no model at all |
 | 1.4.1 | Fixed a crash on every annotate run in 1.4.0 (`unexpected keyword argument 'labelling'`) |
@@ -559,7 +579,7 @@ device coordinates, and hit-tested there. Keep it that way.
 | 1.1.1 | Fixed a crash when zooming with the scroll wheel on an annotated image |
 | 1.1.0 | Projects, image list with per-image status, export log, bundled `.app` |
 | 1.0.0 | First version |
-| `workers.py` | `QThread`s for model loading and inference |
+| `workers.py` | `QThread`s for model loading, inference and image decoding |
 | `scan.py` | Folder scanning and image-format triage |
 | `export.py` | CSV summary and YOLO label writing |
 

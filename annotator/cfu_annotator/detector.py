@@ -200,8 +200,18 @@ class Detector:
         from PIL import Image
 
         Image.MAX_IMAGE_PIXELS = None  # plate photos are legitimately huge
-        with Image.open(image_path) as handle:
-            image = handle.convert("RGB")
+        # convert() copies even when the mode already matches, which on a
+        # 10400px plate means holding two 400 MB decodes at once — enough
+        # memory pressure to make the whole machine crawl part-way through a
+        # folder. Plate photos are RGB JPEGs, so the copy is almost always
+        # pure waste. load() decodes in place and releases the file handle.
+        image = Image.open(image_path)
+        if image.mode != "RGB":
+            converted = image.convert("RGB")
+            image.close()
+            image = converted
+        else:
+            image.load()
         width, height = image.size
 
         single_pass = not tiling or (width <= tile_size and height <= tile_size)

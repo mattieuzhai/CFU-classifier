@@ -1,9 +1,38 @@
 """Background threads, so loading a model or running inference never freezes the UI."""
 
 from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtGui import QImage
 
 from . import render
 from .detector import Detector
+
+
+class ImageDecodeWorker(QThread):
+    """Decodes one plate photo off the UI thread.
+
+    A full-resolution plate is 40-110 megapixels and takes 350-500 ms to
+    decode, which is exactly how long the window used to sit frozen every time
+    someone pressed Next. A QImage can be built on a worker thread (a QPixmap
+    cannot), and converting one to the other on the UI thread afterwards costs
+    nothing measurable.
+
+    The token is echoed back untouched so the window can recognise and discard
+    the result of a decode it has already navigated away from.
+    """
+
+    decoded = pyqtSignal(int, object)      # token, QImage (null if it failed)
+
+    def __init__(self, token, path, parent=None):
+        super().__init__(parent)
+        self.token = token
+        self.path = str(path)
+
+    def run(self):
+        try:
+            image = QImage(self.path)
+        except Exception:                            # noqa: BLE001
+            image = QImage()
+        self.decoded.emit(self.token, image)
 
 
 class ModelLoadWorker(QThread):
