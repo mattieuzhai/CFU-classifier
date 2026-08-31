@@ -76,10 +76,43 @@ _HANDLE_CURSORS = {
 }
 
 
+#: Built once. `class_color` hands out these shared instances rather than
+#: parsing a hex string on every box of every frame, which showed up as real
+#: time in a repaint profile. Callers must copy before mutating — see `paint`.
+_CLASS_QCOLORS = tuple(QColor(c) for c in CLASS_COLORS)
+_UNLABELLED_QCOLOR = QColor(UNLABELLED_COLOR)
+
+
 def class_color(cls_id):
+    """The colour for a class id. Shared — copy it before mutating."""
     if cls_id is None or cls_id < 0:
-        return QColor(UNLABELLED_COLOR)
-    return QColor(CLASS_COLORS[cls_id % len(CLASS_COLORS)])
+        return _UNLABELLED_QCOLOR
+    return _CLASS_QCOLORS[cls_id % len(_CLASS_QCOLORS)]
+
+
+#: Widened only so QGraphicsRectItem's C++ boundingRect pads by ITEM_PAD; this
+#: pen is never used to draw anything.
+_GEOMETRY_PEN = QPen()
+_GEOMETRY_PEN.setWidthF(2 * ITEM_PAD)
+
+#: Pens, keyed by (class, selected, needs attention). Small and bounded by the
+#: class count, and it keeps QPen construction out of the per-box paint path.
+_PEN_CACHE = {}
+
+
+def _box_pen(cls_id, selected, attention):
+    key = (cls_id if cls_id is not None and cls_id >= 0 else UNLABELLED,
+           selected, attention)
+    pen = _PEN_CACHE.get(key)
+    if pen is None:
+        pen = QPen(class_color(cls_id))
+        pen.setCosmetic(True)              # constant line width at any zoom
+        pen.setWidth(3 if selected else 2)
+        if attention:
+            # Dashed = still needs a decision. Grey as well when unlabelled.
+            pen.setStyle(Qt.DashLine)
+        _PEN_CACHE[key] = pen
+    return pen
 
 
 class BoxItem(QGraphicsRectItem):
@@ -96,6 +129,11 @@ class BoxItem(QGraphicsRectItem):
         self.unconfirmed = bool(unconfirmed)
         self.canvas = canvas
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        # Geometry only, never rendered: `paint` sets its own pen. QGraphicsRectItem
+        # pads its C++ boundingRect by half the pen width, so a pen of 2*ITEM_PAD
+        # reproduces the padding this class used to add in a Python override —
+        # without paying a Python call for every item on every frame.
+        self.setPen(_GEOMETRY_PEN)
         self.refresh_z()
 
     def needs_attention(self):
@@ -110,10 +148,9 @@ class BoxItem(QGraphicsRectItem):
 
     # -- geometry: constant, never a function of the view ------------------
 
-    def boundingRect(self):
-        return self.rect().normalized().adjusted(
-            -ITEM_PAD, -ITEM_PAD, ITEM_PAD, ITEM_PAD
-        )
+    # boundingRect() is deliberately NOT overridden — see the pen set in
+    # __init__. QGraphicsRectItem's own implementation returns exactly the same
+    # rect and stays view-independent, which is the invariant that matters.
 
     def shape(self):
         path = QPainterPath()
@@ -123,18 +160,10 @@ class BoxItem(QGraphicsRectItem):
     # -- painting: just the rectangle; labels/handles are the view's job ---
 
     def paint(self, painter, option, widget=None):
-        color = class_color(self.cls_id)
         selected = self.isSelected()
-
-        pen = QPen(color)
-        pen.setCosmetic(True)              # constant line width at any zoom
-        pen.setWidth(3 if selected else 2)
-        if self.needs_attention():
-            # Dashed = still needs a decision. Grey as well when unlabelled.
-            pen.setStyle(Qt.DashLine)
-        painter.setPen(pen)
+        painter.setPen(_box_pen(self.cls_id, selected, self.needs_attention()))
         if selected:
-            fill = QColor(color)
+            fill = QColor(class_color(self.cls_id))   # copy: about to be mutated
             fill.setAlpha(55)
             painter.setBrush(fill)
         else:
@@ -236,6 +265,16 @@ class ImageCanvas(QGraphicsView):
         return f"class {cls_id}"
 
     def has_image(self):
+        """True once the canvas knows the image's dimensions.
+
+        Deliberately not "the pixels have arrived": boxes are stored in image
+        coordinates, so as soon as the size is known the canvas is fully usable
+        — boxes draw, select and edit — while the plate itself is still being
+        decoded on a worker thread. `showing_pixels` is the narrower question.
+        """
+        return self._image_size[0] > 0 and self._image_size[1] > 0
+
+    def showing_pixels(self):
         return self._pixmap_item is not None
 
     def image_size(self):
@@ -244,11 +283,53 @@ class ImageCanvas(QGraphicsView):
     def image_rect(self):
         return QRectF(0, 0, self._image_size[0], self._image_size[1])
 
-    def load_image(self, path):
-        pixmap = QPixmap(str(path))
+    def begin_loading(self, size):
+        """Adopt an image's dimensions before its pixels are available.
+
+        Clears whatever was on screen and sizes the scene from `size`, so the
+        view is ready for boxes immediately; call `set_decoded_image` when the
+        decode finishes.
+        """
         self._cancel_interaction()
         self._scene.clear()
         self._pixmap_item = None
+        width, height = int(size[0]), int(size[1])
+        if width <= 0 or height <= 0:
+            self._image_size = (0, 0)
+            self._scene.setSceneRect(QRectF(0, 0, 1, 1))
+            return False
+        self._image_size = (width, height)
+        self._scene.setSceneRect(self.image_rect())
+        self.fit_to_window()
+        return True
+
+    def set_decoded_image(self, image):
+        """Put decoded pixels behind the boxes that are already on screen."""
+        if image is None or image.isNull():
+            return False
+        pixmap = QPixmap.fromImage(image)
+        if pixmap.isNull():
+            return False
+        if self._pixmap_item is not None:
+            self._scene.removeItem(self._pixmap_item)
+        self._pixmap_item = self._scene.addPixmap(pixmap)
+        self._pixmap_item.setZValue(0)
+        if (pixmap.width(), pixmap.height()) != self._image_size:
+            # The header lied, or it was a format QImageReader sizes loosely.
+            self._image_size = (pixmap.width(), pixmap.height())
+            self._scene.setSceneRect(self.image_rect())
+            self.fit_to_window()
+        else:
+            self.viewport().update()
+        return True
+
+    def load_image(self, path):
+        # Release the previous plate before decoding the next one: holding both
+        # doubles the peak, and a full-resolution plate is 150-450 MB.
+        self._cancel_interaction()
+        self._scene.clear()
+        self._pixmap_item = None
+        pixmap = QPixmap(str(path))
         if pixmap.isNull():
             self._image_size = (0, 0)
             self._scene.setSceneRect(QRectF(0, 0, 1, 1))
@@ -420,6 +501,27 @@ class ImageCanvas(QGraphicsView):
             self.status_message.emit(f"Accepted {accepted} suggested label(s)")
         return accepted
 
+    def tally(self):
+        """Per-class counts, unlabelled and unconfirmed — in a single pass.
+
+        The three used to be separate scans of the scene and all three run on
+        every box change, so on a busy plate they were walked three times for
+        one keystroke.
+        """
+        counts = [0] * max(1, len(self.class_names))
+        limit = len(counts)
+        unlabelled = unconfirmed = 0
+        for item in self.box_items():
+            cls_id = item.cls_id
+            if cls_id < 0:
+                unlabelled += 1
+                continue
+            if item.unconfirmed:
+                unconfirmed += 1
+            if cls_id < limit:
+                counts[cls_id] += 1
+        return counts, unlabelled, unconfirmed
+
     def counts_by_class(self):
         counts = [0] * max(1, len(self.class_names))
         for item in self.box_items():
@@ -564,6 +666,16 @@ class ImageCanvas(QGraphicsView):
         }
 
     def drawForeground(self, painter, rect):
+        """Labels, handles and the locked badge, in device coordinates.
+
+        A plate can carry a couple of thousand boxes, and this runs on every
+        repaint, so it deliberately does not walk them all. Two cheap culls do
+        the work: the scene's spatial index narrows it to what is on screen, and
+        a size test drops anything too small to carry a readable label — which
+        at fit-to-window is very nearly everything. Selected boxes are handled
+        separately, since they always get a label and handles however small they
+        are, and there are only ever a handful of them.
+        """
         super().drawForeground(painter, rect)
         if not self.has_image():
             return
@@ -578,20 +690,40 @@ class ImageCanvas(QGraphicsView):
         painter.setFont(font)
         metrics = QFontMetrics(font)
 
-        for item in self.box_items():
+        selected = [i for i in self._scene.selectedItems() if isinstance(i, BoxItem)]
+
+        if self.show_labels:
+            # The view only ever scales and translates, so on-screen width is
+            # width * scale; comparing in image pixels avoids mapping the rect
+            # of every box just to discover it is too small to label.
+            scale = max(self.transform().m11(), 1e-9)
+            min_width = LABEL_MIN_WIDTH_PX / scale
+            exposed = self.mapToScene(self.viewport().rect()).boundingRect()
+            for item in self._scene.items(exposed):
+                if not isinstance(item, BoxItem) or item.isSelected():
+                    continue          # selected boxes are drawn in the pass below
+                if item.rect().normalized().width() < min_width:
+                    continue
+                device = self._device_rect(item)
+                if not device.intersects(viewport_rect):
+                    continue
+                self._draw_label(painter, metrics, item, device,
+                                 class_color(item.cls_id))
+
+        for item in selected:
             device = self._device_rect(item)
             if not device.intersects(viewport_rect):
                 continue
-            selected = item.isSelected()
             color = class_color(item.cls_id)
-
-            if self.show_labels and (selected or device.width() >= LABEL_MIN_WIDTH_PX):
+            if self.show_labels:
                 self._draw_label(painter, metrics, item, device, color)
-            if selected:
-                self._draw_handles(painter, device, color)
+            self._draw_handles(painter, device, color)
 
         if self.locked:
             self._draw_locked_badge(painter, metrics)
+        elif not self.showing_pixels():
+            self._draw_badge(painter, metrics, "Loading image…",
+                             QColor(60, 60, 60, 225))
         painter.restore()
 
     def _draw_label(self, painter, metrics, item, device, color):
@@ -633,6 +765,9 @@ class ImageCanvas(QGraphicsView):
             text, colour = "CONTAMINATED — no counts", QColor(179, 38, 30, 230)
         else:
             text, colour = "FINALIZED — locked", QColor(31, 79, 216, 225)
+        self._draw_badge(painter, metrics, text, colour)
+
+    def _draw_badge(self, painter, metrics, text, colour):
         pad = 8
         box = QRectF(
             10, 10,
