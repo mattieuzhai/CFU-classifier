@@ -535,6 +535,15 @@ class MainWindow(QMainWindow):
         self.check_csv.setChecked(True)
         self.check_csv.setToolTip("One row per image, one column per class")
 
+        self.check_areas = QCheckBox(f"Colony sizes  ({export.AREAS_NAME})")
+        self.check_areas.setChecked(True)
+        self.check_areas.setToolTip(
+            "One row per colony, with the size of each one.\n\n"
+            "Sizes are given as a fraction of the image and relative to the "
+            "median colony on the same plate, so neither depends on knowing "
+            "how many pixels a millimetre is. Pixel areas are included too."
+        )
+
         self.check_yolo = QCheckBox(f"YOLO labels  ({export.YOLO_DIRNAME}/)")
         self.check_yolo.setToolTip("One .txt per image in YOLO format, plus classes.txt")
 
@@ -567,6 +576,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(button)
         layout.addWidget(self.label_output)
         layout.addWidget(self.check_csv)
+        layout.addWidget(self.check_areas)
         layout.addWidget(self.check_yolo)
         layout.addWidget(self.check_images)
         layout.addLayout(name_row)
@@ -1834,6 +1844,7 @@ class MainWindow(QMainWindow):
             "tile_size": self.spin_tile.value(),
             "tile_overlap": self.spin_overlap.value(),
             "export_csv": self.check_csv.isChecked(),
+            "export_areas": self.check_areas.isChecked(),
             "export_yolo": self.check_yolo.isChecked(),
             "export_images": self.check_images.isChecked(),
             "show_labels": self.check_labels.isChecked(),
@@ -1862,6 +1873,7 @@ class MainWindow(QMainWindow):
             prefs.get_float(values, "tile_overlap", det.DEFAULT_TILE_OVERLAP)
         )
         self.check_csv.setChecked(prefs.get_bool(values, "export_csv", True))
+        self.check_areas.setChecked(prefs.get_bool(values, "export_areas", True))
         self.check_yolo.setChecked(prefs.get_bool(values, "export_yolo", False))
         self.check_images.setChecked(prefs.get_bool(values, "export_images", True))
         self.check_labels.setChecked(prefs.get_bool(values, "show_labels", True))
@@ -1957,6 +1969,7 @@ class MainWindow(QMainWindow):
             output_folder=self.output_folder,
             export_options={
                 "csv": self.check_csv.isChecked(),
+                "areas": self.check_areas.isChecked(),
                 "yolo": self.check_yolo.isChecked(),
             },
             detection=self._detection_settings(),
@@ -2078,6 +2091,7 @@ class MainWindow(QMainWindow):
                 self.combo_labelling.blockSignals(False)
         options = data["export_options"]
         self.check_csv.setChecked(bool(options.get("csv", True)))
+        self.check_areas.setChecked(bool(options.get("areas", True)))
         self.check_yolo.setChecked(bool(options.get("yolo", False)))
 
         # Class names from the project, so saved boxes are readable even if the
@@ -2153,13 +2167,14 @@ class MainWindow(QMainWindow):
             )
             return
         want_csv = self.check_csv.isChecked()
+        want_areas = self.check_areas.isChecked()
         want_yolo = self.check_yolo.isChecked()
         want_images = self.check_images.isChecked()
-        if not (want_csv or want_yolo or want_images):
+        if not (want_csv or want_areas or want_yolo or want_images):
             QMessageBox.information(
                 self, "Nothing selected",
-                "Tick at least one output — the count summary, YOLO labels, "
-                "annotated images, or any combination.",
+                "Tick at least one output — the count summary, colony sizes, "
+                "YOLO labels, annotated images, or any combination.",
             )
             return
 
@@ -2204,7 +2219,8 @@ class MainWindow(QMainWindow):
             if answer != QMessageBox.Yes:
                 return
 
-        if want_yolo:
+        if want_yolo or want_areas:
+            # Both normalise against the plate's pixel dimensions.
             self._ensure_image_sizes()
 
         try:
@@ -2228,6 +2244,23 @@ class MainWindow(QMainWindow):
             if want_csv:
                 export.write_csv(folder, image_names, class_names, self.records)
                 written.append(export.CSV_NAME)
+            if want_areas:
+                _, colonies, no_size = export.write_areas(
+                    folder, image_names, class_names, self.records,
+                    self.image_sizes,
+                )
+                written.append(f"{export.AREAS_NAME}  ({colonies} colony/colonies)")
+                if no_size:
+                    listed = ", ".join(no_size[:5])
+                    more = f" and {len(no_size) - 5} more" if len(no_size) > 5 else ""
+                    QMessageBox.warning(
+                        self, "Some colony sizes were skipped",
+                        f"{len(no_size)} annotated image(s) are missing from "
+                        f"{export.AREAS_NAME} because their pixel dimensions "
+                        f"could not be read, so a size has no meaning for "
+                        f"them:\n\n    {listed}{more}\n\nThe count summary is "
+                        "unaffected.",
+                    )
             if want_yolo:
                 _, count = export.write_yolo(
                     folder, class_names, self.records, self.image_sizes

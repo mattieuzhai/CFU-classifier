@@ -165,6 +165,7 @@ Click **Choose output folder…**, then tick what you want written:
 | Option | Output | Default |
 |---|---|---|
 | **Count summary** | `CFU_counts.csv` | on |
+| **Colony sizes** | `CFU_areas.csv` | on |
 | **YOLO labels** | `yolo_labels/` | off |
 | **Annotated images** | `annotated_images/` | on |
 | *(always)* | `export_info.txt` | — |
@@ -177,6 +178,7 @@ folder inside it. Type a name in the **Folder** box — `March 2026 counts`,
 counts_out/                          ← the folder you chose
 ├── March 2026 counts/               ← a name you typed
 │   ├── CFU_counts.csv
+│   ├── CFU_areas.csv
 │   ├── export_info.txt
 │   ├── yolo_labels/
 │   └── annotated_images/
@@ -210,6 +212,42 @@ states as the image list (`not_annotated` / `annotated` / `edited` /
 `finalized`), so a row of zeros is never ambiguous — you can tell a plate with
 genuinely no colonies from one you never got to, and which counts a human has
 checked.
+
+#### Colony sizes
+
+`CFU_areas.csv` has one row per colony, for when size matters as much as number:
+
+```
+image,colony,class,area_fraction,relative_area,area_px,width_px,height_px,aspect_ratio,center_x,center_y,confidence
+plate1.jpg,1,BFU,9.76563e-06,0.3839,400.0,20.0,20.0,1.000,0.017188,0.032813,0.900
+plate1.jpg,2,GM,3.90625e-05,1.5355,1600.0,40.0,40.0,1.000,0.159375,0.104688,0.750
+plate1.jpg,3,GM,8.78906e-05,3.4549,3600.0,60.0,60.0,1.000,0.254688,0.153125,0.650
+```
+
+Size is given two ways, and neither needs you to know how many pixels a
+millimetre is:
+
+- **`area_fraction`** — the colony's box as a fraction of the whole image.
+  Comparable between plates as long as the plate fills the frame the same way in
+  each photo.
+- **`relative_area`** — the same area divided by the median colony area *on that
+  plate*. `1.0` is a typical colony there, `2.0` is one twice its size. Because
+  each plate is normalised against itself, this survives a change of camera,
+  crop or magnification between plates.
+
+The pixel figures are there too (`area_px`, `width_px`, `height_px`), so if you
+ever photograph a scale bar you can convert the whole file to real units.
+`aspect_ratio` is width ÷ height, which separates round colonies from elongated
+ones; `center_x` and `center_y` are 0–1 positions, so you can find any row back
+on the plate.
+
+Sizes come from the detection bounding boxes, so they measure the box enclosing
+each colony rather than its outline — fine for comparing colonies with each
+other, which is what size is usually wanted for here.
+
+Contaminated plates are left out, as they are from the counts, so a discarded
+plate can't skew a size distribution. Unlabelled boxes are left out too, which
+keeps each plate's row count equal to its `total` in `CFU_counts.csv`.
 
 `export_info.txt` is written every time you export, without being asked for. It
 records how the numbers were produced:
@@ -568,6 +606,7 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.6.2 | Export writes `CFU_areas.csv` — one row per colony, with its size as a fraction of the image and relative to the median colony on the same plate |
 | 1.6.1 | Fixed three ways a model re-run could throw away hand-made annotations: "Annotate all remaining" no longer replaces plates you annotated yourself, the Image menu no longer carried duplicate Annotate actions that stayed live during a run, and the re-run shortcut moved from a bare `R` to ⌘R |
 | 1.6.0 | Performance: plates decode on a background thread so navigation no longer freezes the window, the canvas redraws 3-6x faster on busy plates, inference uses ~400 MB less memory per plate, and the undo history is capped by size as well as depth |
 | 1.5.1 | A way back from a custom class list to the model's, including a prompt when switching to a model-driven labelling mode |
@@ -581,7 +620,7 @@ device coordinates, and hit-tested there. Keep it that way.
 | 1.0.0 | First version |
 | `workers.py` | `QThread`s for model loading, inference and image decoding |
 | `scan.py` | Folder scanning and image-format triage |
-| `export.py` | CSV summary and YOLO label writing |
+| `export.py` | Count summary, colony sizes, YOLO labels and the run log |
 
 Built on PyQt5 and Ultralytics; both are already in `../.venv`. The tiling and
 merge logic mirrors `../nuc/model_handler.py`, which serves the same model to
