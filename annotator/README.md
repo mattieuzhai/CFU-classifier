@@ -426,6 +426,19 @@ while there are unsaved changes, and the app offers to save before you quit,
 open another project, or switch image folders. Saving is atomic, so a crash
 part-way through can't corrupt a project you already had.
 
+The file is gzipped JSON. A 200-plate experiment with 1500 colonies a plate
+comes to about 6 MB — it was 39 MB before v1.6.3 — and saves in roughly a
+second, opening in a third of one. To read one by eye:
+
+```bash
+gunzip -c "March 2026.cfuproj" | python -m json.tool | less
+```
+
+**Projects saved by any earlier version still open**, and re-saving one quietly
+upgrades it. The reverse does not hold: a project saved by v1.6.3 or later will
+not open in an older build, which will report it as unreadable JSON. Keep
+everyone on the same version and this never comes up.
+
 Boxes are stored in image pixel coordinates, not tied to any folder path, so a
 project survives having its images moved: point it at the new folder and
 everything lines up. If images have gone missing or new ones have appeared since
@@ -606,6 +619,7 @@ device coordinates, and hit-tested there. Keep it that way.
 
 | Version | Change |
 |---|---|
+| 1.6.3 | Project files are 6.5x smaller and open 2.4x faster; a corrupt project now names the box it choked on instead of crashing. Older projects still open, but projects saved from here on will not open in older builds |
 | 1.6.2 | Export writes `CFU_areas.csv` — one row per colony, with its size as a fraction of the image and relative to the median colony on the same plate |
 | 1.6.1 | Fixed three ways a model re-run could throw away hand-made annotations: "Annotate all remaining" no longer replaces plates you annotated yourself, the Image menu no longer carried duplicate Annotate actions that stayed live during a run, and the re-run shortcut moved from a bare `R` to ⌘R |
 | 1.6.0 | Performance: plates decode on a background thread so navigation no longer freezes the window, the canvas redraws 3-6x faster on busy plates, inference uses ~400 MB less memory per plate, and the undo history is capped by size as well as depth |
