@@ -173,6 +173,7 @@ check("run log does not claim yolo when unticked", export.YOLO_DIRNAME not in in
 
 # nothing selected at all
 w.check_csv.setChecked(False); w.check_yolo.setChecked(False); w.check_images.setChecked(False)
+w.check_areas.setChecked(False)
 log.clear(); w.export_now()
 check("refuses when nothing is ticked", any(k == "i" for k, *r in log), log)
 before_dirs = set(p.name for p in OUT.iterdir() if p.is_dir())
