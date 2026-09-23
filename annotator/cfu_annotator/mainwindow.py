@@ -1371,6 +1371,7 @@ class MainWindow(QMainWindow):
         self._refresh_position_label()
         self._refresh_counts()
         self._update_enabled_state()
+        self._refresh_pre_edit()   # this state is the new undo baseline
         self._show_status(
             f"'{name}' marked as finalized — its annotations are locked. "
             "Use the same button to unlock."
@@ -1430,6 +1431,7 @@ class MainWindow(QMainWindow):
         self._refresh_position_label()
         self._refresh_counts()
         self._update_enabled_state()
+        self._refresh_pre_edit()   # this state is the new undo baseline
         self._show_status(message)
 
     # ------------------------------------------------------------------ undo
@@ -2552,6 +2554,11 @@ class MainWindow(QMainWindow):
         self._refresh_image_row()
         self._refresh_position_label()
         self._refresh_counts()
+        # Re-arm for the NEXT edit. Without this, _pre_edit stays pinned to the
+        # state the image had when it was opened, so every later edit pushes that
+        # same stale snapshot and a single undo discards the whole session's work
+        # on this image instead of just the last change.
+        self._refresh_pre_edit()
 
     def _on_cursor_moved(self, x, y):
         width, height = self.canvas.image_size()
