@@ -3,8 +3,11 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
-# Ignore all data subfolders except data/split
-data/*
+# Plate images and every tiled/split derivative. These live on the lab machine
+# and in the data deposit, never in git: they are gigabytes of JPEGs, git
+# stores them uncompressed forever, and they are patient-derived material.
+# Removed from this repository's history in October 2026.
+data/
 
 
 # PyInstaller build output (multi-GB — never commit)
